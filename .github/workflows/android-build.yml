@@ -28,9 +28,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '9.5.0'
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null
       - name: Install Android platform
-        run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+        run: sdkmanager --install "platforms;android-37" "build-tools;36.0.0"
       - name: Assemble
         run: gradle :app:assembleDebug
