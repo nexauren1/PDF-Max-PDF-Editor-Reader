@@ -37,12 +37,13 @@ jobs:
           gradle-version: "8.9"
 
       - name: Decode private upload keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/release-upload.jks
-          test -s app/release-upload.jks
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/release-upload.jks
+            test -s app/release-upload.jks
+          fi
 
       - name: Assemble debug and release APKs
         env:

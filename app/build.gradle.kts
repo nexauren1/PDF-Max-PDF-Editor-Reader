@@ -18,7 +18,7 @@ android {
     val signingStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
     val signingKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
     val signingKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
-    val hasReleaseCredentials = !signingStorePath.isNullOrBlank() &&
+    val hasReleaseCredentials = !signingStorePath.isNullOrBlank() && file(signingStorePath).isFile &&
         !signingStorePassword.isNullOrBlank() &&
         !signingKeyAlias.isNullOrBlank() &&
         !signingKeyPassword.isNullOrBlank()
