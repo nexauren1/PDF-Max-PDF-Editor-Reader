@@ -144,7 +144,7 @@ private val tools = listOf(
     Tool("Assinar PDF", "Sign PDF", "Assinatura e preenchimento", "Sign and fill documents", Icons.Filled.Draw, Violet, Group.EDIT),
     Tool("Digitalizar", "Scan", "Digitalize documentos", "Scan paper documents", Icons.Filled.CameraAlt, Blue, Group.SCAN),
     Tool("OCR", "OCR", "Reconheça texto em imagens", "Recognize text in images", Icons.Filled.TextFields, Green, Group.SCAN),
-    Tool("Extrair imagens", "Extract images", "Guarde imagens do PDF", "Save images from a PDF", ImageIcon, Pink, Group.EXTRA),
+    Tool("Extrair imagens", "Extract images", "Guarde imagens do PDF", "Save images from a PDF", Icons.Filled.ImageIcon, Pink, Group.EXTRA),
     Tool("Rodar páginas", "Rotate pages", "Ajuste a orientação", "Adjust page orientation", Icons.Filled.RotateRight, Orange, Group.ORGANIZE),
     Tool("Numerar páginas", "Page numbers", "Adicione números às páginas", "Add page numbers", Icons.Filled.Numbers, Cyan, Group.ORGANIZE),
     Tool("Marca de água", "Watermark", "Texto ou imagem personalizada", "Custom text or image", Icons.Filled.Description, Violet, Group.EDIT),
@@ -540,7 +540,7 @@ private fun ToolDetail(tool: Tool, en: Boolean, openPdf: () -> Unit) {
             }
             Group.EDIT -> SectionCard(tr(en, "Ferramentas de edição", "Editing tools")) {
                 OptionLine(Icons.Filled.TextFields, tr(en, "Adicionar texto", "Add text"), tr(en, "Pronto", "Ready"))
-                OptionLine(ImageIcon, tr(en, "Inserir imagem", "Insert image"), tr(en, "Escolher", "Choose"))
+                OptionLine(Icons.Filled.ImageIcon, tr(en, "Inserir imagem", "Insert image"), tr(en, "Escolher", "Choose"))
                 OptionLine(Icons.Filled.Draw, tr(en, "Desenho e assinatura", "Draw and signature"), tr(en, "Abrir", "Open"))
             }
         }
