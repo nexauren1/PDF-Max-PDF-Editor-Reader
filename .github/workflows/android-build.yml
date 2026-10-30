@@ -33,5 +33,15 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Assemble debug APK
-        run: gradle assembleDebug
+      - name: Assemble debug and release APKs
+        run: gradle assembleDebug assembleRelease
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-max-apks
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
