@@ -28,6 +28,7 @@ fun PdfPagePreview(
     uri: Uri?,
     modifier: Modifier = Modifier,
     pageIndex: Int = 0,
+    thumbnail: Boolean = false,
     onPageCount: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -78,15 +79,16 @@ fun PdfPagePreview(
 
     Box(
         modifier = modifier.fillMaxWidth()
-            .background(Color(0xFF09162A), RoundedCornerShape(18.dp)).padding(10.dp),
+            .background(Color(0xFF09162A), RoundedCornerShape(if (thumbnail) 7.dp else 18.dp))
+            .padding(if (thumbnail) 3.dp else 10.dp),
         contentAlignment = Alignment.Center
     ) {
         when {
             bitmap != null -> Image(
                 bitmap = bitmap!!.asImageBitmap(),
                 contentDescription = "Página " + (pageIndex + 1) + " do documento PDF",
-                modifier = Modifier.fillMaxWidth(),
-                contentScale = ContentScale.FillWidth
+                modifier = if (thumbnail) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
+                contentScale = if (thumbnail) ContentScale.Fit else ContentScale.FillWidth
             )
             uri == null -> SampleDocumentPage()
             failed -> Text("Não foi possível pré-visualizar esta página.", color = Color.White)

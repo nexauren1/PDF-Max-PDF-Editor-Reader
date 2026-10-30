@@ -74,7 +74,18 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
     var pdfUri by remember { mutableStateOf(initialPdf) }
     var selectedFile by remember { mutableStateOf<File?>(null) }
     var pdfName by remember { mutableStateOf("Relatório_Final.pdf") }
-    var english by remember { mutableStateOf(false) }
+    val appContext = LocalContext.current
+    var english by remember {
+        mutableStateOf(
+            appContext.getSharedPreferences("pdfmax_preferences", android.content.Context.MODE_PRIVATE)
+                .getBoolean("english", false)
+        )
+    }
+    fun toggleLanguage() {
+        english = !english
+        appContext.getSharedPreferences("pdfmax_preferences", android.content.Context.MODE_PRIVATE)
+            .edit().putBoolean("english", english).apply()
+    }
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -90,7 +101,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                 drawerContainerColor = Color(0xFF09172D),
                 drawerContentColor = MaxText
             ) {
-                SideMenu(screen, english, { go(it) }, { english = !english })
+                SideMenu(screen, english, { go(it) }, { toggleLanguage() })
             }
         }
     ) {
@@ -130,7 +141,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                     Page.CONVERTER -> ToolWorkspaceScreen(tools[1], english)
                     Page.SCANNER -> ToolWorkspaceScreen(tools[7], english)
                     Page.PROTECT -> ToolWorkspaceScreen(tools[5], english)
-                    Page.SETTINGS -> SettingsPage(english, { english = !english })
+                    Page.SETTINGS -> SettingsPage(english, { toggleLanguage() })
                     Page.TOOL -> ToolWorkspaceScreen(currentTool, english)
                 }
             }
@@ -170,7 +181,7 @@ private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) 
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp, vertical = 5.dp)) {
         Text(if (en) "Hello, welcome back" else "Olá, bem-vindo!", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
-        Text(if (en) "Manage your documents and explore your tools." else "Gere os seus documentos e aproveite todas as ferramentas.", color = MaxMuted, fontSize = 12.sp)
+        Text(if (en) "Manage your documents and explore your tools." else "Gira os seus documentos e explore as ferramentas.", color = MaxMuted, fontSize = 12.sp)
         Spacer(Modifier.height(16.dp))
         SearchBar(if (en) "Search files and folders…" else "Pesquisar arquivos e pastas…") { navigate(Page.FILES) }
         Spacer(Modifier.height(15.dp))
@@ -407,10 +418,12 @@ private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> 
                         .background(Color(0xFF172943)).clickable { pageNumber = n }.padding(5.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(Modifier.fillMaxWidth().height(66.dp).background(Color(0xFFF3F6FB), RoundedCornerShape(3.dp)).padding(5.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(Modifier.fillMaxWidth().height(13.dp).background(Color(0xFF2166AB)))
-                        repeat(4) { Box(Modifier.fillMaxWidth(if (it == 3) 0.7f else 1f).height(3.dp).background(Color(0xFFD6DEEA))) }
-                    }
+                    PdfPagePreview(
+                        uri = uri,
+                        modifier = Modifier.fillMaxWidth().height(76.dp),
+                        pageIndex = n - 1,
+                        thumbnail = true
+                    )
                     Text("$n", color = Color.White, fontSize = 10.sp)
                 }
             }
