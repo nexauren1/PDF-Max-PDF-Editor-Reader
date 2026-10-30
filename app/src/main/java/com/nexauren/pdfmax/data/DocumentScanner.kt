@@ -192,8 +192,11 @@ object DocumentScanner {
             }
 
             var rowsRead = queryMediaStore(appContext, found, modifiedAfter, extensionFilter = true)
-            if (rowsRead == 0) {
-                rowsRead = queryMediaStore(appContext, found, modifiedAfter, extensionFilter = false)
+            if (rowsRead <= 0) {
+                // Retry with a broad filename query if the OEM provider rejects or
+                // ignores the extension-specific selection.
+                val broadRows = queryMediaStore(appContext, found, modifiedAfter, extensionFilter = false)
+                if (broadRows >= 0) rowsRead = broadRows
             }
             val mediaStoreWorked = rowsRead >= 0
             val lastFallback = prefs.getLong(PREF_LAST_FALLBACK, 0L)
