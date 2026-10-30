@@ -1,5 +1,8 @@
 name: Android build
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ main ]
@@ -45,3 +48,19 @@ jobs:
             app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish preview release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pdf-max-preview-${{ github.run_number }}
+          name: "PDF Max preview #${{ github.run_number }}"
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          prerelease: true
+          make_latest: false
+          files: app/build/outputs/apk/release/app-release.apk
+          body: |
+            PDF Max Android preview build for device testing.
+            This APK is signed with the debug key and is not a Google Play production upload.
+            A private production upload keystore must be configured before store publication.

@@ -80,6 +80,8 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
         } else permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
+    LaunchedEffect(Unit) { refresh() }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) refresh() }
         lifecycleOwner.lifecycle.addObserver(observer)

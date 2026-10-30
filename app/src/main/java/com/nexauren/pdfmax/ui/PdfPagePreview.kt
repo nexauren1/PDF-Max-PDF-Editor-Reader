@@ -24,41 +24,55 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun PdfPagePreview(uri: Uri?, modifier: Modifier = Modifier) {
+fun PdfPagePreview(
+    uri: Uri?,
+    modifier: Modifier = Modifier,
+    pageIndex: Int = 0,
+    onPageCount: (Int) -> Unit = {}
+) {
     val context = LocalContext.current
-    var bitmap by remember(uri) { mutableStateOf<Bitmap?>(null) }
-    var failed by remember(uri) { mutableStateOf(false) }
+    var bitmap by remember(uri, pageIndex) { mutableStateOf<Bitmap?>(null) }
+    var failed by remember(uri, pageIndex) { mutableStateOf(false) }
 
-    LaunchedEffect(uri) {
+    LaunchedEffect(uri, pageIndex) {
         bitmap = null
         failed = false
         if (uri != null) {
-            bitmap = withContext(Dispatchers.IO) {
+            val result = withContext(Dispatchers.IO) {
                 try {
                     val descriptor = if (uri.scheme == "file") {
                         uri.path?.let { ParcelFileDescriptor.open(File(it), ParcelFileDescriptor.MODE_READ_ONLY) }
                     } else {
                         context.contentResolver.openFileDescriptor(uri, "r")
-                    } ?: return@withContext null
+                    } ?: return@withContext null to 0
+
                     descriptor.use { pfd ->
                         val renderer = PdfRenderer(pfd)
                         try {
-                            if (renderer.pageCount == 0) return@withContext null
-                            val page = renderer.openPage(0)
+                            val count = renderer.pageCount
+                            if (count == 0) return@withContext null to 0
+                            val safeIndex = pageIndex.coerceIn(0, count - 1)
+                            val page = renderer.openPage(safeIndex)
                             try {
-                                val width = (page.width * 1.5f).toInt().coerceAtLeast(1)
-                                val height = (page.height * 1.5f).toInt().coerceAtLeast(1)
+                                val scale = minOf(1.7f, 2400f / page.width)
+                                val width = (page.width * scale).toInt().coerceAtLeast(1)
+                                val height = (page.height * scale).toInt().coerceAtLeast(1)
                                 val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                                 page.render(output, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                                output
-                            } finally { page.close() }
-                        } finally { renderer.close() }
+                                output to count
+                            } finally {
+                                page.close()
+                            }
+                        } finally {
+                            renderer.close()
+                        }
                     }
                 } catch (_: Exception) {
-                    failed = true
-                    null
+                    null to 0
                 }
             }
+            bitmap = result.first
+            if (result.second > 0) onPageCount(result.second) else failed = true
         }
     }
 
@@ -70,13 +84,13 @@ fun PdfPagePreview(uri: Uri?, modifier: Modifier = Modifier) {
         when {
             bitmap != null -> Image(
                 bitmap = bitmap!!.asImageBitmap(),
-                contentDescription = "Página do documento PDF",
+                contentDescription = "Página " + (pageIndex + 1) + " do documento PDF",
                 modifier = Modifier.fillMaxWidth(),
                 contentScale = ContentScale.FillWidth
             )
             uri == null -> SampleDocumentPage()
-            failed -> Text("Não foi possível pré-visualizar este PDF.", color = Color.White)
-            else -> Text("A preparar pré-visualização…", color = Color(0xFF9AAAC4))
+            failed -> Text("Não foi possível pré-visualizar esta página.", color = Color.White)
+            else -> Text("A preparar página…", color = Color(0xFF9AAAC4))
         }
     }
 }

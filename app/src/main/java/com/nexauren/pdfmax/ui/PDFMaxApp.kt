@@ -62,7 +62,8 @@ private val tools = listOf(
     ToolSpec("Organizar páginas", "Reordenar e eliminar", Icons.Default.GridView, Color(0xFF168DFF)),
     ToolSpec("Imprimir PDF", "Preparar impressão", Icons.Default.Print, Color(0xFF7C70F5)),
     ToolSpec("Partilhar PDF", "Enviar documento", Icons.Default.Share, Color(0xFF16B89B)),
-    ToolSpec("Ver propriedades", "Informações do ficheiro", Icons.Default.Info, Color(0xFF4F8FEA))
+    ToolSpec("Ver propriedades", "Informações do ficheiro", Icons.Default.Info, Color(0xFF4F8FEA)),
+    ToolSpec("Remover páginas", "Eliminar páginas selecionadas", Icons.Default.Delete, Color(0xFFEB5A74))
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -338,7 +339,7 @@ private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
         PageTitle(if (en) "All tools" else "Todas as ferramentas", if (en) "A complete workspace for PDF documents" else "Um espaço completo para trabalhar com documentos PDF")
         SearchBar(if (en) "Find a tool…" else "Procurar uma ferramenta…") {}
         Spacer(Modifier.height(14.dp))
-        SectionTitle(if (en) "PDF tools" else "Ferramentas PDF", "24") {}
+        SectionTitle(if (en) "PDF tools" else "Ferramentas PDF", tools.size.toString()) {}
         ToolGrid(tools, choose)
         Spacer(Modifier.height(18.dp))
         InfoPanel(if (en) "Powerful document workflow" else "Fluxo de documentos avançado", if (en) "Open a tool to configure its options and select a document." else "Abra uma ferramenta para configurar as opções e selecionar um documento.", Icons.Default.AutoAwesome)
@@ -347,21 +348,49 @@ private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
 
 @Composable
 private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> Unit, edit: () -> Unit, choose: (ToolSpec) -> Unit) {
-    var pageNumber by remember { mutableIntStateOf(1) }
+    var pageNumber by remember(uri) { mutableIntStateOf(1) }
+    var pageCount by remember(uri) { mutableIntStateOf(if (uri == null) 24 else 1) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 15.dp, vertical = 7.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(if (uri == null) "Relatório_Final.pdf" else fileName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(if (en) "$pageNumber of 24 pages" else "$pageNumber de 24 páginas", color = MaxMuted, fontSize = 10.sp)
+                Text(if (en) "$pageNumber of $pageCount pages" else "$pageNumber de $pageCount páginas", color = MaxMuted, fontSize = 10.sp)
             }
             IconButton(onClick = openPdf) { Icon(Icons.Default.FolderOpen, null, tint = MaxCyan) }
-            IconButton(onClick = {}) { Icon(Icons.Default.Search, null, tint = MaxText) }
-            IconButton(onClick = {}) { Icon(Icons.Default.BookmarkBorder, null, tint = MaxText) }
+            IconButton(onClick = { pageNumber = 1 }) { Icon(Icons.Default.FirstPage, null, tint = MaxText) }
+            IconButton(onClick = { pageNumber = (pageNumber + 1).coerceAtMost(pageCount) }) { Icon(Icons.Default.ChevronRight, null, tint = MaxText) }
             IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, null, tint = MaxText) }
         }
-        PdfPagePreview(uri, Modifier.padding(top = 3.dp))
+        PdfPagePreview(
+            uri = uri,
+            modifier = Modifier.padding(top = 3.dp),
+            pageIndex = pageNumber - 1,
+            onPageCount = { count ->
+                pageCount = count.coerceAtLeast(1)
+                pageNumber = pageNumber.coerceAtMost(pageCount)
+            }
+        )
+        Spacer(Modifier.height(9.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Color(0xFF112441))
+                .border(1.dp, Color(0xFF294D78), RoundedCornerShape(13.dp)).padding(horizontal = 5.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            IconButton(onClick = { pageNumber = (pageNumber - 1).coerceAtLeast(1) }, enabled = pageNumber > 1) {
+                Icon(Icons.Default.ChevronLeft, null, tint = if (pageNumber > 1) MaxCyan else MaxMuted)
+            }
+            Text(if (en) "Page $pageNumber / $pageCount" else "Página $pageNumber / $pageCount", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            IconButton(onClick = { pageNumber = (pageNumber + 1).coerceAtMost(pageCount) }, enabled = pageNumber < pageCount) {
+                Icon(Icons.Default.ChevronRight, null, tint = if (pageNumber < pageCount) MaxCyan else MaxMuted)
+            }
+        }
         Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(Color(0xFF112441)).border(1.dp, Color(0xFF294D78), RoundedCornerShape(15.dp)).padding(vertical = 11.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(Color(0xFF112441))
+                .border(1.dp, Color(0xFF294D78), RoundedCornerShape(15.dp)).padding(vertical = 11.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
             ReaderAction(Icons.Default.ZoomIn, "Zoom")
             ReaderAction(Icons.Default.Search, if (en) "Search" else "Pesquisar")
             ReaderAction(Icons.Default.BookmarkBorder, if (en) "Bookmarks" else "Marcadores")
@@ -371,8 +400,13 @@ private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> 
         Spacer(Modifier.height(12.dp))
         SectionTitle(if (en) "Pages" else "Páginas", if (en) "Organize" else "Organizar") { choose(tools[20]) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            (1..5).forEach { n ->
-                Column(Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).border(if (pageNumber == n) 2.dp else 1.dp, if (pageNumber == n) MaxBlue else Color(0xFF263C5D), RoundedCornerShape(8.dp)).background(Color(0xFF172943)).clickable { pageNumber = n }.padding(5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            (1..pageCount.coerceAtMost(5)).forEach { n ->
+                Column(
+                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
+                        .border(if (pageNumber == n) 2.dp else 1.dp, if (pageNumber == n) MaxBlue else Color(0xFF263C5D), RoundedCornerShape(8.dp))
+                        .background(Color(0xFF172943)).clickable { pageNumber = n }.padding(5.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Column(Modifier.fillMaxWidth().height(66.dp).background(Color(0xFFF3F6FB), RoundedCornerShape(3.dp)).padding(5.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Box(Modifier.fillMaxWidth().height(13.dp).background(Color(0xFF2166AB)))
                         repeat(4) { Box(Modifier.fillMaxWidth(if (it == 3) 0.7f else 1f).height(3.dp).background(Color(0xFFD6DEEA))) }
@@ -386,6 +420,7 @@ private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> 
             PrimaryAction(if (en) "Edit PDF" else "Editar PDF", Icons.Default.Edit, edit, Modifier.weight(1f))
             SecondaryAction(if (en) "More tools" else "Mais ferramentas", Icons.Default.GridView, { choose(tools[20]) }, Modifier.weight(1f))
         }
+        Spacer(Modifier.height(12.dp))
     }
 }
 

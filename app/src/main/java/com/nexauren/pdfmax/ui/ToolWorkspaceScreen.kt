@@ -37,6 +37,8 @@ import com.nexauren.pdfmax.data.DocumentKind
 import com.nexauren.pdfmax.data.DocumentScanner
 import com.nexauren.pdfmax.data.IndexedDocument
 import com.nexauren.pdfmax.data.PdfOperations
+import com.nexauren.pdfmax.data.AdvancedPdfOperations
+import com.nexauren.pdfmax.data.OfficeExportOperations
 import com.nexauren.pdfmax.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -61,6 +63,11 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     var password by remember { mutableStateOf("") }
     var firstPage by remember { mutableStateOf("1") }
     var lastPage by remember { mutableStateOf("3") }
+    var pageOrder by remember { mutableStateOf("1,2,3") }
+    var removePageNumbers by remember { mutableStateOf("2") }
+    var formFieldName by remember { mutableStateOf("") }
+    var formFieldValue by remember { mutableStateOf("") }
+    var signatureStrokes by remember { mutableStateOf<List<List<Pair<Float, Float>>>>(emptyList()) }
     var rotation by remember { mutableIntStateOf(90) }
     var exportFormat by remember { mutableStateOf("Word") }
     var showAll by remember { mutableStateOf(false) }
@@ -85,6 +92,8 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         } else permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
+    LaunchedEffect(Unit) { refresh() }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) refresh() }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -95,7 +104,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     val needsTwo = tool.title == "Juntar PDF" || tool.title == "Comparar PDFs"
     val eligible = when (tool.title) {
         "Digitalizar e OCR", "Imagem para PDF" -> documents.filter { it.kind == DocumentKind.IMAGE }
-        "PDF para imagem", "Extrair imagens", "Juntar PDF", "Dividir PDF", "Comprimir PDF", "Proteger PDF", "Rodar páginas", "Adicionar texto", "Editar PDF", "Marca de água", "Numerar páginas", "Assinar PDF", "Reparar PDF", "Ver propriedades", "Organizar páginas", "Traduzir PDF", "Preencher formulários", "Imprimir PDF", "Partilhar PDF" -> documents.filter { it.kind == DocumentKind.PDF }
+        "PDF para imagem", "Extrair imagens", "Juntar PDF", "Dividir PDF", "Comprimir PDF", "Proteger PDF", "Rodar páginas", "Adicionar texto", "Editar PDF", "Marca de água", "Numerar páginas", "Assinar PDF", "Reparar PDF", "Ver propriedades", "Organizar páginas", "Remover páginas", "Traduzir PDF", "Preencher formulários", "Imprimir PDF", "Partilhar PDF" -> documents.filter { it.kind == DocumentKind.PDF }
         "Converter PDF" -> documents.filter { it.kind == DocumentKind.PDF || it.extension in setOf("docx", "xlsx", "pptx", "jpg", "jpeg", "png") }
         else -> documents
     }
@@ -124,7 +133,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         "Proteger PDF" -> listOf(PdfOperations.protect(context, file!!, password))
                         "Rodar páginas" -> listOf(PdfOperations.rotate(context, file!!, rotation))
                         "Editar PDF", "Adicionar texto" -> listOf(PdfOperations.addText(context, file!!, textOption))
-                        "Assinar PDF" -> listOf(PdfOperations.addText(context, file!!, textOption.ifBlank { "Assinatura" }))
+                        "Assinar PDF" -> listOf(AdvancedPdfOperations.addHandwrittenSignature(context, file!!, signatureStrokes))
                         "Marca de água" -> listOf(PdfOperations.addText(context, file!!, textOption, watermark = true))
                         "Numerar páginas" -> listOf(PdfOperations.addText(context, file!!, "", numbering = true))
                         "Reparar PDF" -> listOf(PdfOperations.repair(context, file!!))
@@ -142,18 +151,17 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             emptyList()
                         }
                         "Converter PDF" -> when {
-                            file!!.extension.equals("docx", true) -> listOf(PdfOperations.convertDocxToPdf(context, file))
+                            file!!.extension.lowercase() in setOf("docx", "xlsx", "pptx", "txt", "csv", "rtf", "md") -> listOf(AdvancedPdfOperations.officeToPdf(context, file))
                             file.extension.equals("pdf", true) && exportFormat == "Word" -> listOf(PdfOperations.pdfToDocx(context, file))
-                            file.extension.equals("pdf", true) && exportFormat == "Excel" -> {
-                                val csv = File(PdfOperations.outputDirectory(), file.nameWithoutExtension + "_PDF_Max.csv")
-                                csv.writeText(PdfOperations.extractText(context, file).lines().joinToString("\n") { "\"" + it.replace("\"", "\"\"") + "\"" })
-                                listOf(csv)
-                            }
+                            file.extension.equals("pdf", true) && exportFormat == "Excel" -> listOf(AdvancedPdfOperations.pdfToExcel(context, file))
+                            file.extension.equals("pdf", true) && exportFormat == "PowerPoint" -> listOf(OfficeExportOperations.pdfToPowerPoint(context, file))
                             file.extension.lowercase() in setOf("jpg", "jpeg", "png") -> listOf(PdfOperations.imageToPdf(context, file))
                             else -> error(if (english) "This source/target format is not supported by the current converter." else "Este formato de origem/destino ainda não é suportado pelo conversor.")
                         }
                         "Criar PDF" -> listOf(PdfOperations.createPdfFromText(context, "Novo_Documento", textOption.ifBlank { "Documento criado com PDF Max" }))
-                        "Organizar páginas" -> listOf(PdfOperations.repair(context, file!!))
+                        "Organizar páginas" -> listOf(AdvancedPdfOperations.reorderPages(context, file!!, pageOrder.split(",").mapNotNull { it.trim().toIntOrNull() }))
+                        "Remover páginas" -> listOf(AdvancedPdfOperations.removePages(context, file!!, removePageNumbers.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()))
+                        "Preencher formulários" -> listOf(AdvancedPdfOperations.fillFormField(context, file!!, formFieldName, formFieldValue))
                         "Traduzir PDF" -> error(if (english) "Translation service is not configured. Your document has not been uploaded anywhere." else "O serviço de tradução não está configurado. O documento não foi enviado para lado nenhum.")
                         "Preencher formulários" -> error(if (english) "The form editor is not available yet." else "O editor de formulários ainda não está disponível.")
                         "Imprimir PDF", "Partilhar PDF" -> error(if (english) "Use the PDF reader's share/print controls for this document." else "Use os controlos de partilha/impressão do leitor para este documento.")
@@ -250,11 +258,21 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("Word", "Excel", "PowerPoint").forEach { format -> ChoiceChip(format, exportFormat == format, { exportFormat = format }, tool.color) }
                         }
-                        Text(if (english) "DOCX export preserves extracted text; complex layout, images and tables may need manual adjustment." else "A exportação DOCX preserva o texto extraído; layouts complexos, imagens e tabelas podem precisar de ajustes manuais.", color = MaxMuted, fontSize = 9.sp)
+                        Text(if (english) "PDF to Office keeps selectable text. Page layout, complex tables and images may need manual adjustment." else "A conversão para Office preserva o texto selecionável. O layout, tabelas complexas e imagens podem precisar de ajustes manuais.", color = MaxMuted, fontSize = 9.sp)
                     }
-                    "Editar PDF", "Adicionar texto", "Assinar PDF", "Marca de água", "Criar PDF" -> {
+                    "Assinar PDF" -> SignaturePad(english) { signatureStrokes = it }
+                    "Organizar páginas" -> {
+                        OutlinedTextField(pageOrder, { pageOrder = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "New page order (e.g. 3,1,2)" else "Nova ordem das páginas (ex.: 3,1,2)") }, singleLine = true, colors = toolFieldColors())
+                        InfoLine(if (english) "Only listed pages are kept, in the order entered." else "Apenas as páginas indicadas são mantidas, pela ordem escrita.", Icons.Default.GridView)
+                    }
+                    "Remover páginas" -> OutlinedTextField(removePageNumbers, { removePageNumbers = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "Pages to remove (e.g. 2,4)" else "Páginas a remover (ex.: 2,4)") }, singleLine = true, colors = toolFieldColors())
+                    "Preencher formulários" -> {
+                        OutlinedTextField(formFieldName, { formFieldName = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "PDF form field name" else "Nome do campo do formulário PDF") }, singleLine = true, colors = toolFieldColors())
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(formFieldValue, { formFieldValue = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "Value to insert" else "Valor a inserir") }, minLines = 2, colors = toolFieldColors())
+                    }
+                    "Editar PDF", "Adicionar texto", "Marca de água", "Criar PDF" -> {
                         OutlinedTextField(textOption, { textOption = it }, modifier = Modifier.fillMaxWidth(), label = { Text(when (tool.title) {
-                            "Assinar PDF" -> if (english) "Signature name / text" else "Nome / texto da assinatura"
                             "Marca de água" -> if (english) "Watermark text" else "Texto da marca de água"
                             "Criar PDF" -> if (english) "Document content" else "Conteúdo do documento"
                             else -> if (english) "Text to add to every page" else "Texto a adicionar a cada página"
@@ -266,8 +284,9 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                     "Juntar PDF" -> InfoLine(if (english) "Selected PDFs are combined in the order shown in the library." else "Os PDFs selecionados são combinados pela ordem apresentada na biblioteca.", Icons.Default.MergeType)
                     "Comparar PDFs" -> InfoLine(if (english) "Compare extracted text and show lines that appear added or removed." else "Compare o texto extraído e mostre as linhas que parecem adicionadas ou removidas.", Icons.Default.CompareArrows)
                     "Traduzir PDF" -> InfoLine(if (english) "Translation is not enabled yet; the document remains local." else "A tradução ainda não está ativada; o documento permanece no dispositivo.", Icons.Default.Translate)
-                    "Preencher formulários" -> InfoLine(if (english) "Form field editing is not connected yet." else "A edição de campos de formulário ainda não está ligada.", Icons.Default.EditNote)
-                    "Organizar páginas" -> InfoLine(if (english) "Page reordering is planned; a normalized copy can be saved now." else "A reordenação de páginas está planeada; é possível guardar uma cópia normalizada nesta versão.", Icons.Default.GridView)
+                    "Preencher formulários" -> InfoLine(if (english) "Fill existing AcroForm text fields in the selected PDF." else "Preencha campos AcroForm de texto existentes no PDF selecionado.", Icons.Default.EditNote)
+                    "Organizar páginas" -> InfoLine(if (english) "Reorder PDF pages using the comma-separated page order above." else "Reordene páginas do PDF com a ordem de números separada por vírgulas acima.", Icons.Default.GridView)
+                    "Remover páginas" -> InfoLine(if (english) "Remove the selected page numbers and save a new PDF." else "Remova as páginas indicadas e guarde um novo PDF.", Icons.Default.Delete)
                     else -> InfoLine(if (english) "Choose a source document to continue." else "Escolha um documento de origem para continuar.", tool.icon)
                 }
             }
