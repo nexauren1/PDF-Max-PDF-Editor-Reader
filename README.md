@@ -54,7 +54,7 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 - The handwritten signature is a visible image stamp, not a certificate-backed cryptographic digital signature.
 - Filling forms supports existing AcroForm text fields, not every XFA form.
 - PDF resave/repair/compression depends on the source PDF; a resaved file is not guaranteed to be smaller or recoverable if severely corrupted.
-- Automatic PDF translation requires a translation model/service and is not enabled in this build.
+- PDF translation uses on-device ML Kit language models. The first use downloads the selected source/target models over Wi‑Fi (model downloads can be roughly 30 MB each); scanned PDFs need OCR before translation.
 
 ## Build in Android Studio
 

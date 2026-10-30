@@ -38,6 +38,7 @@ import com.nexauren.pdfmax.data.DocumentScanner
 import com.nexauren.pdfmax.data.IndexedDocument
 import com.nexauren.pdfmax.data.PdfOperations
 import com.nexauren.pdfmax.data.DocumentActions
+import com.nexauren.pdfmax.data.PdfTranslationOperations
 import com.nexauren.pdfmax.data.AdvancedPdfOperations
 import com.nexauren.pdfmax.data.OfficeExportOperations
 import com.nexauren.pdfmax.ui.theme.*
@@ -69,6 +70,8 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     var formFieldName by remember { mutableStateOf("") }
     var formFieldValue by remember { mutableStateOf("") }
     var signatureStrokes by remember { mutableStateOf<List<List<Pair<Float, Float>>>>(emptyList()) }
+    var sourceLanguage by remember { mutableStateOf("pt") }
+    var targetLanguage by remember { mutableStateOf("en") }
     var rotation by remember { mutableIntStateOf(90) }
     var exportFormat by remember { mutableStateOf("Word") }
     var showAll by remember { mutableStateOf(false) }
@@ -163,8 +166,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         "Organizar páginas" -> listOf(AdvancedPdfOperations.reorderPages(context, file!!, pageOrder.split(",").mapNotNull { it.trim().toIntOrNull() }))
                         "Remover páginas" -> listOf(AdvancedPdfOperations.removePages(context, file!!, removePageNumbers.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()))
                         "Preencher formulários" -> listOf(AdvancedPdfOperations.fillFormField(context, file!!, formFieldName, formFieldValue))
-                        "Traduzir PDF" -> error(if (english) "Translation service is not configured. Your document has not been uploaded anywhere." else "O serviço de tradução não está configurado. O documento não foi enviado para lado nenhum.")
-                        "Preencher formulários" -> error(if (english) "The form editor is not available yet." else "O editor de formulários ainda não está disponível.")
+                        "Traduzir PDF" -> listOf(PdfTranslationOperations.translatePdf(context, file!!, sourceLanguage, targetLanguage))
                         "Imprimir PDF" -> {
                             withContext(Dispatchers.Main) { DocumentActions.print(context, file!!) }
                             emptyList()
@@ -301,7 +303,37 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                     "Imagem para PDF" -> InfoLine(if (english) "The selected image will be placed on an A4 page." else "A imagem selecionada será colocada numa página A4.", Icons.Default.Image)
                     "Juntar PDF" -> InfoLine(if (english) "Selected PDFs are combined in the order shown in the library." else "Os PDFs selecionados são combinados pela ordem apresentada na biblioteca.", Icons.Default.MergeType)
                     "Comparar PDFs" -> InfoLine(if (english) "Compare extracted text and show lines that appear added or removed." else "Compare o texto extraído e mostre as linhas que parecem adicionadas ou removidas.", Icons.Default.CompareArrows)
-                    "Traduzir PDF" -> InfoLine(if (english) "Translation is not enabled yet; the document remains local." else "A tradução ainda não está ativada; o documento permanece no dispositivo.", Icons.Default.Translate)
+                    "Traduzir PDF" -> {
+                        val languages = listOf(
+                            "Português" to "pt",
+                            "English" to "en",
+                            "Français" to "fr",
+                            "Español" to "es",
+                            "Deutsch" to "de",
+                            "Italiano" to "it"
+                        )
+                        Text(if (english) "Source language" else "Idioma de origem", color = MaxMuted, fontSize = 10.sp)
+                        languages.chunked(3).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                row.forEach { language ->
+                                    ChoiceChip(language.first, sourceLanguage == language.second, { sourceLanguage = language.second }, tool.color)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(if (english) "Target language" else "Idioma de destino", color = MaxMuted, fontSize = 10.sp)
+                        languages.chunked(3).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                row.forEach { language ->
+                                    ChoiceChip(language.first, targetLanguage == language.second, { targetLanguage = language.second }, tool.color)
+                                }
+                            }
+                        }
+                        InfoLine(
+                            if (english) "Translation runs on this device. The first use downloads the selected language models over Wi-Fi." else "A tradução é executada neste dispositivo. Na primeira utilização, os modelos de idioma são descarregados por Wi-Fi.",
+                            Icons.Default.Translate
+                        )
+                    }
                     "Preencher formulários" -> InfoLine(if (english) "Fill existing AcroForm text fields in the selected PDF." else "Preencha campos AcroForm de texto existentes no PDF selecionado.", Icons.Default.EditNote)
                     "Organizar páginas" -> InfoLine(if (english) "Reorder PDF pages using the comma-separated page order above." else "Reordene páginas do PDF com a ordem de números separada por vírgulas acima.", Icons.Default.GridView)
                     "Remover páginas" -> InfoLine(if (english) "Remove the selected page numbers and save a new PDF." else "Remova as páginas indicadas e guarde um novo PDF.", Icons.Default.Delete)

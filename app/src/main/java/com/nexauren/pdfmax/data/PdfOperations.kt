@@ -300,6 +300,16 @@ object PdfOperations {
     }
 
     private fun xmlEscape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    private fun latin(value: String) = value.map { if (it.code in 32..126 || it == '\n' || it == '\t') it else ' ' }.joinToString("")
+    private fun latin(value: String): String {
+        val windows1252Extras = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ"
+        return value.map { character ->
+            if (
+                character == '\n' || character == '\t' ||
+                character.code in 32..126 ||
+                character.code in 160..255 ||
+                character in windows1252Extras
+            ) character else ' '
+        }.joinToString("")
+    }
     private fun wrap(value: String, max: Int): List<String> = if (value.isEmpty()) listOf("") else value.chunked(max)
 }

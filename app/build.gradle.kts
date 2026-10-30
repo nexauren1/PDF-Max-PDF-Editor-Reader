@@ -45,5 +45,6 @@ dependencies {
     implementation("androidx.camera:camera-view:1.4.1")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.2")
+    implementation("com.google.mlkit:translate:17.0.3")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
