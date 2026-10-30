@@ -41,7 +41,7 @@ The tool screens are a visual and interaction foundation. Each processing engine
 - Kotlin 2.4.21 Compose compiler plugin
 - Jetpack Compose BOM 2026.08.00
 - JDK 17
-- compileSdk 37, targetSdk 36, minSdk 26
+- compileSdk 36, targetSdk 36, minSdk 26
 
 Open the repository in Android Studio and allow Gradle sync to download the configured dependencies. The binary Gradle Wrapper JAR and launch scripts are not yet committed; use Android Studio's Gradle wrapper generation or install Gradle 9.6.0 locally until that is added.
 
