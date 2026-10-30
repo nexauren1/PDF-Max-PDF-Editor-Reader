@@ -28,6 +28,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.nexauren.pdfmax.ui.theme.*
+import com.nexauren.pdfmax.data.DocumentKind
+import com.nexauren.pdfmax.data.DocumentScanner
+import com.nexauren.pdfmax.data.IndexedDocument
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 internal enum class Page { HOME, FILES, TOOLS, READER, OFFICE, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
@@ -105,7 +110,12 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
             ) {
                 TopBar(screen, english, { scope.launch { drawer.open() } }, { go(Page.HOME) }, { go(Page.SETTINGS) })
                 when (screen) {
-                    Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { picker.launch(arrayOf("application/pdf")) })
+                    Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { go(Page.FILES) }) { file ->
+    selectedFile = file
+    pdfName = file.name
+    pdfUri = Uri.fromFile(file)
+    screen = if (file.extension.equals("pdf", true)) Page.READER else Page.OFFICE
+}
                     Page.FILES -> DocumentLibraryScreen(english) { file ->
                         selectedFile = file
                         pdfName = file.name
@@ -114,7 +124,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                     }
                     Page.OFFICE -> OfficePreviewScreen(selectedFile, english) { go(Page.FILES) }
                     Page.TOOLS -> ToolsPage(english, { openTool(it) })
-                    Page.READER -> ReaderPage(english, pdfName, pdfUri, { picker.launch(arrayOf("application/pdf")) }, { go(Page.EDITOR) }, { openTool(it) })
+                    Page.READER -> ReaderPage(english, pdfName, pdfUri, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
                     Page.EDITOR -> ToolWorkspaceScreen(tools[0], english)
                     Page.CONVERTER -> ToolWorkspaceScreen(tools[1], english)
                     Page.SCANNER -> ToolWorkspaceScreen(tools[7], english)
@@ -149,7 +159,14 @@ private fun TopBar(screen: Page, english: Boolean, onMenu: () -> Unit, onBack: (
 }
 
 @Composable
-private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) -> Unit, openPdf: () -> Unit) {
+private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) -> Unit, openPdf: () -> Unit, openFile: (File) -> Unit) {
+    val context = LocalContext.current
+    var recentDocuments by remember { mutableStateOf<List<IndexedDocument>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        if (DocumentScanner.hasAccess(context)) {
+            recentDocuments = withContext(Dispatchers.IO) { DocumentScanner.scan(context).take(5) }
+        }
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp, vertical = 5.dp)) {
         Text(if (en) "Hello, welcome back" else "Olá, bem-vindo!", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
         Text(if (en) "Manage your documents and explore your tools." else "Gere os seus documentos e aproveite todas as ferramentas.", color = MaxMuted, fontSize = 12.sp)
@@ -190,10 +207,21 @@ private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) 
         ToolGrid(listOf(tools[0], tools[1], tools[2], tools[3], tools[5], tools[7]), choose)
         Spacer(Modifier.height(18.dp))
         SectionTitle(if (en) "Recent files" else "Arquivos recentes", if (en) "View all" else "Ver todos") { navigate(Page.FILES) }
-        RecentRow("Relatório_Final.pdf", "2.4 MB  •  Hoje, 09:12", Color(0xFFFF477A)) { navigate(Page.READER) }
-        RecentRow("Apresentação.pdf", "5.8 MB  •  Ontem, 16:45", Color(0xFF9D62F5)) { navigate(Page.READER) }
-        RecentRow("Contrato.pdf", "1.2 MB  •  20 Out, 12:08", Color(0xFF1CC99A)) { navigate(Page.READER) }
-        RecentRow("Notas.pdf", "980 KB  •  18 Out, 10:20", Color(0xFFFF9B3D)) { navigate(Page.READER) }
+        if (recentDocuments.isEmpty()) {
+            Text(if (en) "Your recent documents will appear here after enabling the file library." else "Os documentos recentes aparecerão aqui depois de ativar a biblioteca de ficheiros.", color = MaxMuted, fontSize = 10.sp, lineHeight = 15.sp)
+        } else {
+            recentDocuments.forEach { item ->
+                val accent = when (item.kind) {
+                    DocumentKind.PDF -> Color(0xFFFF477A)
+                    DocumentKind.WORD -> Color(0xFF398BFF)
+                    DocumentKind.EXCEL -> Color(0xFF1CC99A)
+                    DocumentKind.POWERPOINT -> Color(0xFFFF9B3D)
+                    DocumentKind.IMAGE -> Color(0xFF9D62F5)
+                    else -> Color(0xFF24B9C7)
+                }
+                RecentRow(item.name, item.sizeLabel + "  •  " + item.extension.uppercase(), accent) { openFile(item.file) }
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.FolderOpen, null, tint = MaxCyan)
             Spacer(Modifier.width(8.dp))
