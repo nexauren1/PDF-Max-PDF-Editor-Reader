@@ -113,8 +113,13 @@ object DocumentScanner {
             val appContext = context.applicationContext
             val found = LinkedHashMap<String, IndexedDocument>()
 
+            // MediaStore is Android indexed catalogue and is substantially faster
+            // than walking storage. Only use folder fallback when the OEM index
+            // returns no usable documents at all.
             queryMediaStore(appContext, found)
-            scanKnownFolders(appContext, found)
+            if (found.isEmpty()) {
+                scanKnownFolders(appContext, found)
+            }
 
             val result = found.values.sortedByDescending { it.modified }
             cachedFiles = result
@@ -137,10 +142,10 @@ object DocumentScanner {
             MediaStore.MediaColumns.DATE_MODIFIED
         )
         val selection = supportedExtensions.joinToString(" OR ") {
-            "\${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
+            "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
         }
         val selectionArgs = supportedExtensions.map { "%.$it" }.toTypedArray()
-        val sortOrder = "\${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
+        val sortOrder = "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
 
         try {
             context.contentResolver.query(
@@ -164,8 +169,9 @@ object DocumentScanner {
                     val extension = file.extension.lowercase(Locale.ROOT)
                     if (extension !in supportedExtensions || !file.isFile || !file.canRead()) continue
 
-                    val canonicalPath = runCatching { file.canonicalPath }.getOrDefault(file.absolutePath)
-                    if (destination.containsKey(canonicalPath)) continue
+                    // Avoid canonicalPath: it can trigger slow filesystem I/O per row.
+                    val pathKey = file.absolutePath
+                    if (destination.containsKey(pathKey)) continue
 
                     val name = cursor.getString(nameColumn)?.takeIf { it.isNotBlank() } ?: file.name
                     val size = if (sizeColumn >= 0) cursor.getLong(sizeColumn).coerceAtLeast(0L) else file.length()
@@ -173,7 +179,7 @@ object DocumentScanner {
                     val modifiedSeconds = if (modifiedColumn >= 0) cursor.getLong(modifiedColumn) else 0L
                     val modifiedMillis = if (modifiedSeconds > 0L) modifiedSeconds * 1000L else file.lastModified()
 
-                    destination[canonicalPath] = IndexedDocument(
+                    destination[pathKey] = IndexedDocument(
                         file = file,
                         name = name,
                         extension = extension,
@@ -237,10 +243,10 @@ object DocumentScanner {
                     val extension = child.extension.lowercase(Locale.ROOT)
                     if (extension !in supportedExtensions) continue
 
-                    val canonicalPath = runCatching { child.canonicalPath }.getOrDefault(child.absolutePath)
-                    if (destination.containsKey(canonicalPath)) continue
+                    val pathKey = child.absolutePath
+                    if (destination.containsKey(pathKey)) continue
 
-                    destination[canonicalPath] = IndexedDocument(child)
+                    destination[pathKey] = IndexedDocument(child)
                     added++
                 }
             }

@@ -68,6 +68,11 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
             return
         }
         if (loading) return
+        // Show the previous index immediately; refresh it in the background.
+        DocumentScanner.cachedDocuments().takeIf { it.isNotEmpty() }?.let {
+            files = it
+            scanned = true
+        }
         loading = true
         scanError = null
         scope.launch {

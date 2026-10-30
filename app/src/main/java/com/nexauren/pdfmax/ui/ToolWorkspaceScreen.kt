@@ -91,6 +91,8 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
             return
         }
         if (loading) return
+        // Keep the last known index visible while the background refresh runs.
+        DocumentScanner.cachedDocuments().takeIf { it.isNotEmpty() }?.let { documents = it }
         loading = true
         scope.launch {
             val result = runCatching {
@@ -143,7 +145,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         "Criar ZIP", "Detetar duplicados" -> documents
         else -> documents
     }
-    val visible = eligible.filter { item -> query.isBlank() || item.name.contains(query, true) || item.file.parent.orEmpty().contains(query, true) || item.extension.contains(query.removePrefix("."), true) }.take(if (showAll) 300 else 8)
+    val visible = eligible.filter { item -> query.isBlank() || item.name.contains(query, true) || item.file.parent.orEmpty().contains(query, true) || item.extension.contains(query.removePrefix("."), true) }.take(if (showAll) 1000 else 40)
 
     fun execute() {
         val file = selected

@@ -13,3 +13,8 @@ local.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# Private Android signing keys
+*.jks
+*.keystore
+app/release-upload.jks

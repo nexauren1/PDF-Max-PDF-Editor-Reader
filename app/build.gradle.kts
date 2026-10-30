@@ -14,6 +14,24 @@ android {
         versionName = "1.1.1"
     }
     buildFeatures { compose = true }
+    val signingStorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+    val signingStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    val signingKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+    val signingKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+    val hasReleaseCredentials = !signingStorePath.isNullOrBlank() &&
+        !signingStorePassword.isNullOrBlank() &&
+        !signingKeyAlias.isNullOrBlank() &&
+        !signingKeyPassword.isNullOrBlank()
+    signingConfigs {
+        create("upload") {
+            if (hasReleaseCredentials) {
+                storeFile = file(signingStorePath!!)
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -21,8 +39,8 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildTypes {
         getByName("release") {
-            // Test-only signing. Replace with a private upload key before Google Play publishing.
-            signingConfig = signingConfigs.getByName("debug")
+            // Use the private upload key when configured; otherwise keep preview builds installable.
+            signingConfig = if (hasReleaseCredentials) signingConfigs.getByName("upload") else signingConfigs.getByName("debug")
             isMinifyEnabled = false
         }
     }

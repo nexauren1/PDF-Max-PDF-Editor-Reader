@@ -36,7 +36,20 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Decode private upload keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/release-upload.jks
+          test -s app/release-upload.jks
+
       - name: Assemble debug and release APKs
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/app/release-upload.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle assembleDebug assembleRelease
 
       - name: Upload APKs
@@ -62,5 +75,5 @@ jobs:
           files: app/build/outputs/apk/release/app-release.apk
           body: |
             PDF Max Android preview build for device testing.
-            This APK is signed with the debug key and is not a Google Play production upload.
-            A private production upload keystore must be configured before store publication.
+            When the four ANDROID_* signing secrets are configured, the APK uses the private upload key.
+            Without them, the APK uses the debug key for testing only and is not a Play Store upload.
