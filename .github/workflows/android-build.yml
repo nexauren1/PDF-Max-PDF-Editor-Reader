@@ -33,6 +33,6 @@ jobs:
         with:
           packages: 'platform-tools'
       - name: Install Android platform
-        run: sdkmanager --install "platforms;android-37" "build-tools;36.0.0"
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
       - name: Assemble
         run: gradle :app:assembleDebug
