@@ -337,6 +337,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             scope.launch {
                                 documents = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
                                 selectedPath = captured.absolutePath
+                                selectedPaths = selectedPaths + captured.absolutePath
                             }
                         }
                         Spacer(Modifier.height(9.dp))

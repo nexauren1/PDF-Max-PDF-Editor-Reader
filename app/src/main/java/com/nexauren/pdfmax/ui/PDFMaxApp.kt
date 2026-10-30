@@ -351,13 +351,42 @@ private fun FilesPage(en: Boolean, fileName: String, openPdf: () -> Unit, openRe
 }
 
 @Composable
+@Composable
 private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    val visibleTools = tools.filter {
+        query.isBlank() || it.title.contains(query, true) || it.subtitle.contains(query, true)
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
         PageTitle(if (en) "All tools" else "Todas as ferramentas", if (en) "A complete workspace for PDF documents" else "Um espaço completo para trabalhar com documentos PDF")
-        SearchBar(if (en) "Find a tool…" else "Procurar uma ferramenta…") {}
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            shape = RoundedCornerShape(14.dp),
+            placeholder = { Text(if (en) "Search a tool…" else "Pesquisar uma ferramenta…", color = MaxMuted, fontSize = 12.sp) },
+            leadingIcon = { Icon(Icons.Default.Search, null, tint = MaxMuted) },
+            trailingIcon = {
+                if (query.isNotBlank()) {
+                    IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Default.Close, null, tint = MaxMuted)
+                    }
+                }
+            },
+            colors = darkFieldColors()
+        )
         Spacer(Modifier.height(14.dp))
-        SectionTitle(if (en) "PDF tools" else "Ferramentas PDF", tools.size.toString()) {}
-        ToolGrid(tools, choose)
+        SectionTitle(if (en) "PDF tools" else "Ferramentas PDF", visibleTools.size.toString()) {}
+        if (visibleTools.isEmpty()) {
+            InfoPanel(
+                if (en) "No tools found" else "Nenhuma ferramenta encontrada",
+                if (en) "Try a different word or search by what you want to do." else "Experimente outra palavra ou pesquise pela tarefa que pretende realizar.",
+                Icons.Default.Search
+            )
+        } else {
+            ToolGrid(visibleTools, choose)
+        }
         Spacer(Modifier.height(18.dp))
         InfoPanel(if (en) "Powerful document workflow" else "Fluxo de documentos avançado", if (en) "Open a tool to configure its options and select a document." else "Abra uma ferramenta para configurar as opções e selecionar um documento.", Icons.Default.AutoAwesome)
     }
