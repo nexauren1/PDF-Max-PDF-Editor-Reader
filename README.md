@@ -36,8 +36,8 @@ The tool screens are a visual and interaction foundation. Each processing engine
 
 ## Build environment
 
-- Android Gradle Plugin 9.5.0
-- Gradle 9.6.0
+- Android Gradle Plugin 9.3.1
+- Gradle 9.5.0
 - Kotlin 2.4.21 Compose compiler plugin
 - Jetpack Compose BOM 2026.08.00
 - JDK 17
