@@ -11,7 +11,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,7 +18,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -58,7 +56,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Numbers
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.RotateRight
@@ -66,7 +64,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.SplitScreen
+import androidx.compose.material.icons.filled.CallSplit
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Transform
@@ -139,14 +137,14 @@ private val tools = listOf(
     Tool("Converter PDF", "Convert PDF", "Converta para outros formatos", "Convert to other formats", Icons.Filled.Transform, Blue, Group.CONVERT),
     Tool("Comprimir PDF", "Compress PDF", "Reduza o tamanho do ficheiro", "Reduce file size", Icons.Filled.Compress, Green, Group.EXTRA),
     Tool("Juntar PDF", "Merge PDF", "Combine vários documentos", "Combine multiple documents", Icons.Filled.MergeType, Orange, Group.ORGANIZE),
-    Tool("Dividir PDF", "Split PDF", "Separe páginas e intervalos", "Split pages and ranges", Icons.Filled.SplitScreen, Cyan, Group.ORGANIZE),
+    Tool("Dividir PDF", "Split PDF", "Separe páginas e intervalos", "Split pages and ranges", Icons.Filled.CallSplit, Cyan, Group.ORGANIZE),
     Tool("Proteger PDF", "Protect PDF", "Adicione uma palavra-passe", "Add a password", Icons.Filled.Security, Pink, Group.PROTECT),
     Tool("Assinar PDF", "Sign PDF", "Assinatura e preenchimento", "Sign and fill documents", Icons.Filled.Draw, Violet, Group.EDIT),
     Tool("Digitalizar", "Scan", "Digitalize documentos", "Scan paper documents", Icons.Filled.CameraAlt, Blue, Group.SCAN),
     Tool("OCR", "OCR", "Reconheça texto em imagens", "Recognize text in images", Icons.Filled.TextFields, Green, Group.SCAN),
     Tool("Extrair imagens", "Extract images", "Guarde imagens do PDF", "Save images from a PDF", Icons.Filled.ImageIcon, Pink, Group.EXTRA),
     Tool("Rodar páginas", "Rotate pages", "Ajuste a orientação", "Adjust page orientation", Icons.Filled.RotateRight, Orange, Group.ORGANIZE),
-    Tool("Numerar páginas", "Page numbers", "Adicione números às páginas", "Add page numbers", Icons.Filled.Numbers, Cyan, Group.ORGANIZE),
+    Tool("Numerar páginas", "Page numbers", "Adicione números às páginas", "Add page numbers", Icons.Filled.FormatListNumbered, Cyan, Group.ORGANIZE),
     Tool("Marca de água", "Watermark", "Texto ou imagem personalizada", "Custom text or image", Icons.Filled.Description, Violet, Group.EDIT),
     Tool("Comparar PDF", "Compare PDF", "Encontre diferenças", "Find document differences", Icons.Filled.CompareArrows, Blue, Group.EXTRA),
     Tool("Imprimir PDF", "Print PDF", "Prepare para impressão", "Prepare for printing", Icons.Filled.Print, Green, Group.EXTRA),
@@ -532,7 +530,7 @@ private fun ToolDetail(tool: Tool, en: Boolean, openPdf: () -> Unit) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(tr(en, "Documento", "Document"), tr(en, "Foto", "Photo"), "OCR").forEachIndexed { index, label ->
                         Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(if (index == 0) Icons.Filled.Description else if (index == 1) ImageIcon else Icons.Filled.TextFields, null, tint = listOf(Blue, Violet, Green)[index])
+                            Icon(if (index == 0) Icons.Filled.Description else if (index == 1) Icons.Filled.ImageIcon else Icons.Filled.TextFields, null, tint = listOf(Blue, Violet, Green)[index])
                             Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 10.sp)
                         }
                     }
