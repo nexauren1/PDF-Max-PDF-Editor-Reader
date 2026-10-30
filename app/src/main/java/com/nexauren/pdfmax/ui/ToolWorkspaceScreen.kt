@@ -41,6 +41,7 @@ import com.nexauren.pdfmax.data.DocumentActions
 import com.nexauren.pdfmax.data.PdfTranslationOperations
 import com.nexauren.pdfmax.data.AdvancedPdfOperations
 import com.nexauren.pdfmax.data.OfficeExportOperations
+import com.nexauren.pdfmax.data.DocumentUtilityOperations
 import com.nexauren.pdfmax.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -67,6 +68,11 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     var lastPage by remember { mutableStateOf("3") }
     var pageOrder by remember { mutableStateOf("1,2,3") }
     var removePageNumbers by remember { mutableStateOf("2") }
+    var pageAfter by remember { mutableStateOf("1") }
+    var metadataTitle by remember { mutableStateOf("") }
+    var metadataAuthor by remember { mutableStateOf("") }
+    var metadataSubject by remember { mutableStateOf("") }
+    var metadataKeywords by remember { mutableStateOf("") }
     var formFieldName by remember { mutableStateOf("") }
     var formFieldValue by remember { mutableStateOf("") }
     var signatureStrokes by remember { mutableStateOf<List<List<Pair<Float, Float>>>>(emptyList()) }
@@ -105,23 +111,25 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     }
 
     val selected = documents.firstOrNull { it.file.absolutePath == selectedPath }?.file
-    val needsTwo = tool.title == "Juntar PDF" || tool.title == "Comparar PDFs"
+    val needsMultiple = tool.title in setOf("Juntar PDF", "Comparar PDFs", "Criar ZIP", "Imagem para PDF", "Digitalizar e OCR")
+    val minimumSelection = if (tool.title == "Juntar PDF" || tool.title == "Comparar PDFs") 2 else 1
     val eligible = when (tool.title) {
         "Digitalizar e OCR", "Imagem para PDF" -> documents.filter { it.kind == DocumentKind.IMAGE }
-        "PDF para imagem", "Extrair imagens", "Juntar PDF", "Dividir PDF", "Comprimir PDF", "Proteger PDF", "Rodar páginas", "Adicionar texto", "Editar PDF", "Marca de água", "Numerar páginas", "Assinar PDF", "Reparar PDF", "Ver propriedades", "Organizar páginas", "Remover páginas", "Traduzir PDF", "Preencher formulários", "Imprimir PDF", "Partilhar PDF" -> documents.filter { it.kind == DocumentKind.PDF }
+        "PDF para imagem", "Extrair imagens", "Juntar PDF", "Dividir PDF", "Comprimir PDF", "Proteger PDF", "Rodar páginas", "Adicionar texto", "Editar PDF", "Marca de água", "Numerar páginas", "Assinar PDF", "Reparar PDF", "Ver propriedades", "Organizar páginas", "Remover páginas", "Traduzir PDF", "Preencher formulários", "Imprimir PDF", "Partilhar PDF", "Extrair texto PDF", "Extrair páginas", "Adicionar página em branco", "Editar metadados" -> documents.filter { it.kind == DocumentKind.PDF }
         "Converter PDF" -> documents.filter { it.kind == DocumentKind.PDF || it.extension in setOf("docx", "xlsx", "pptx", "jpg", "jpeg", "png") }
+        "Criar ZIP", "Detetar duplicados" -> documents
         else -> documents
     }
     val visible = eligible.filter { it.name.contains(query, true) }.take(if (showAll) 100 else 6)
 
     fun execute() {
         val file = selected
-        if (tool.title != "Criar PDF" && file == null) {
+        if (tool.title !in setOf("Criar PDF", "Detetar duplicados") && !needsMultiple && file == null) {
             outputMessage = if (english) "Select a document from the internal library first." else "Escolha primeiro um documento na biblioteca interna."
             return
         }
-        if (needsTwo && selectedPaths.size < 2) {
-            outputMessage = if (english) "Select at least two PDF files." else "Selecione pelo menos dois ficheiros PDF."
+        if (needsMultiple && selectedPaths.size < minimumSelection) {
+            outputMessage = if (english) "Select at least " + minimumSelection + " compatible files." else "Selecione pelo menos " + minimumSelection + " ficheiro(s) compatível(eis)."
             return
         }
         scope.launch {
@@ -142,8 +150,8 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         "Numerar páginas" -> listOf(PdfOperations.addText(context, file!!, "", numbering = true))
                         "Reparar PDF" -> listOf(PdfOperations.repair(context, file!!))
                         "PDF para imagem" -> PdfOperations.pdfToImages(context, file!!)
-                        "Imagem para PDF" -> listOf(PdfOperations.imageToPdf(context, file!!))
-                        "Digitalizar e OCR" -> listOf(PdfOperations.recognizeImageToPdf(context, file!!))
+                        "Imagem para PDF" -> listOf(AdvancedPdfOperations.imagesToPdf(context, documents.filter { it.file.absolutePath in selectedPaths }.map { it.file }))
+                        "Digitalizar e OCR" -> listOf(PdfOperations.recognizeImagesToPdf(context, documents.filter { it.file.absolutePath in selectedPaths }.map { it.file }))
                         "Extrair imagens" -> PdfOperations.extractImages(context, file!!)
                         "Ver propriedades" -> {
                             outputMessage = PdfOperations.getProperties(context, file!!)
@@ -164,6 +172,16 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         }
                         "Criar PDF" -> listOf(PdfOperations.createPdfFromText(context, "Novo_Documento", textOption.ifBlank { "Documento criado com PDF Max" }))
                         "Organizar páginas" -> listOf(AdvancedPdfOperations.reorderPages(context, file!!, pageOrder.split(",").mapNotNull { it.trim().toIntOrNull() }))
+                        "Extrair páginas" -> listOf(AdvancedPdfOperations.extractPages(context, file!!, pageOrder.split(",").mapNotNull { it.trim().toIntOrNull() }))
+                        "Adicionar página em branco" -> listOf(AdvancedPdfOperations.insertBlankPage(context, file!!, pageAfter.toIntOrNull() ?: 1))
+                        "Editar metadados" -> listOf(AdvancedPdfOperations.editMetadata(context, file!!, metadataTitle, metadataAuthor, metadataSubject, metadataKeywords))
+                        "Extrair texto PDF" -> listOf(DocumentUtilityOperations.extractTextToFile(context, file!!))
+                        "Criar ZIP" -> listOf(DocumentUtilityOperations.createZip(documents.filter { it.file.absolutePath in selectedPaths }.map { it.file }))
+                        "Detetar duplicados" -> {
+                            val groups = DocumentUtilityOperations.findDuplicateGroups(documents.map { it.file })
+                            outputMessage = DocumentUtilityOperations.duplicateReport(groups)
+                            emptyList()
+                        }
                         "Remover páginas" -> listOf(AdvancedPdfOperations.removePages(context, file!!, removePageNumbers.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()))
                         "Preencher formulários" -> listOf(AdvancedPdfOperations.fillFormField(context, file!!, formFieldName, formFieldValue))
                         "Traduzir PDF" -> listOf(PdfTranslationOperations.translatePdf(context, file!!, sourceLanguage, targetLanguage))
@@ -220,8 +238,18 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
             ToolPanel(if (english) "1 · Select document" else "1 · Selecionar documento", tool.color) {
                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = MaxCyan)
                 OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text(if (english) "Search your files" else "Pesquisar os seus ficheiros") }, colors = toolFieldColors())
-                if (needsTwo) {
-                    Text(if (english) "Choose two or more PDFs" else "Escolha dois ou mais PDFs", color = MaxMuted, fontSize = 10.sp)
+                if (tool.title == "Detetar duplicados") {
+                    InfoLine(if (english) "PDF Max will scan the complete internal library and compare SHA-256 hashes. It will never delete files automatically." else "O PDF Max vai analisar toda a biblioteca interna e comparar hashes SHA-256. Nunca elimina ficheiros automaticamente.", Icons.Default.ContentCopy)
+                } else if (needsMultiple) {
+                    Text(
+                        when (tool.title) {
+                            "Juntar PDF", "Comparar PDFs" -> if (english) "Choose at least two PDFs" else "Escolha pelo menos dois PDFs"
+                            "Imagem para PDF" -> if (english) "Choose the images to combine into one PDF" else "Escolha as imagens que serão reunidas num único PDF"
+                            "Digitalizar e OCR" -> if (english) "Choose one or more scanned images for batch OCR" else "Escolha uma ou várias imagens digitalizadas para OCR em lote"
+                            else -> if (english) "Choose the files to add to the ZIP" else "Escolha os ficheiros a adicionar ao ZIP"
+                        },
+                        color = MaxMuted, fontSize = 10.sp
+                    )
                     visible.forEach { item ->
                         val checked = item.file.absolutePath in selectedPaths
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).clickable {
@@ -276,6 +304,20 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         OutlinedTextField(pageOrder, { pageOrder = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "New page order (e.g. 3,1,2)" else "Nova ordem das páginas (ex.: 3,1,2)") }, singleLine = true, colors = toolFieldColors())
                         InfoLine(if (english) "Only listed pages are kept, in the order entered." else "Apenas as páginas indicadas são mantidas, pela ordem escrita.", Icons.Default.GridView)
                     }
+                    "Extrair páginas" -> {
+                        OutlinedTextField(pageOrder, { pageOrder = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "Pages to extract (e.g. 1,3,5)" else "Páginas a extrair (ex.: 1,3,5)") }, singleLine = true, colors = toolFieldColors())
+                        InfoLine(if (english) "A new PDF is created with only the pages you list, in the same order." else "É criado um novo PDF apenas com as páginas indicadas, na mesma ordem.", Icons.Default.Description)
+                    }
+                    "Adicionar página em branco" -> {
+                        NumberField(if (english) "Insert after page (0 = first page)" else "Inserir depois da página (0 = primeira página)", pageAfter) { pageAfter = it }
+                        InfoLine(if (english) "A blank A4 page is inserted at the selected position. The original PDF stays unchanged." else "É inserida uma página A4 em branco na posição indicada. O PDF original não é alterado.", Icons.Default.NoteAdd)
+                    }
+                    "Editar metadados" -> {
+                        OutlinedTextField(metadataTitle, { metadataTitle = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "Document title" else "Título do documento") }, singleLine = true, colors = toolFieldColors())
+                        OutlinedTextField(metadataAuthor, { metadataAuthor = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "Author" else "Autor") }, singleLine = true, colors = toolFieldColors())
+                        OutlinedTextField(metadataSubject, { metadataSubject = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "Subject" else "Assunto") }, singleLine = true, colors = toolFieldColors())
+                        OutlinedTextField(metadataKeywords, { metadataKeywords = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "Keywords" else "Palavras-chave") }, singleLine = true, colors = toolFieldColors())
+                    }
                     "Remover páginas" -> OutlinedTextField(removePageNumbers, { removePageNumbers = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "Pages to remove (e.g. 2,4)" else "Páginas a remover (ex.: 2,4)") }, singleLine = true, colors = toolFieldColors())
                     "Preencher formulários" -> {
                         OutlinedTextField(formFieldName, { formFieldName = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "PDF form field name" else "Nome do campo do formulário PDF") }, singleLine = true, colors = toolFieldColors())
@@ -298,9 +340,12 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             }
                         }
                         Spacer(Modifier.height(9.dp))
-                        InfoLine(if (english) "Capture a page here or choose an existing image above. OCR runs locally and creates a searchable PDF." else "Capture uma página aqui ou escolha uma imagem existente acima. O OCR é executado localmente e cria um PDF pesquisável.", Icons.Default.TextFields)
+                        InfoLine(if (english) "Capture pages with the built-in camera or select several images above. PDF Max recognizes them locally and creates one searchable PDF." else "Capture páginas com a câmara integrada ou selecione várias imagens acima. O PDF Max reconhece o texto localmente e cria um único PDF pesquisável.", Icons.Default.TextFields)
                     }
-                    "Imagem para PDF" -> InfoLine(if (english) "The selected image will be placed on an A4 page." else "A imagem selecionada será colocada numa página A4.", Icons.Default.Image)
+                    "Imagem para PDF" -> InfoLine(if (english) "Selected images are combined into one multi-page A4 PDF." else "As imagens selecionadas são reunidas num PDF A4 com várias páginas.", Icons.Default.Image)
+                    "Extrair texto PDF" -> InfoLine(if (english) "Extract selectable PDF text into a UTF-8 TXT file, saved in Documents/PDF Max." else "Extraia o texto selecionável do PDF para um ficheiro TXT em Documentos/PDF Max.", Icons.Default.TextSnippet)
+                    "Criar ZIP" -> InfoLine(if (english) "Create one ZIP archive from selected documents. Original files remain untouched." else "Crie um arquivo ZIP com os documentos selecionados. Os ficheiros originais permanecem intactos.", Icons.Default.FolderZip)
+                    "Detetar duplicados" -> InfoLine(if (english) "Compares exact file contents with SHA-256, not just names or file sizes." else "Compara o conteúdo exato através de SHA-256, não apenas os nomes ou tamanhos.", Icons.Default.ContentCopy)
                     "Juntar PDF" -> InfoLine(if (english) "Selected PDFs are combined in the order shown in the library." else "Os PDFs selecionados são combinados pela ordem apresentada na biblioteca.", Icons.Default.MergeType)
                     "Comparar PDFs" -> InfoLine(if (english) "Compare extracted text and show lines that appear added or removed." else "Compare o texto extraído e mostre as linhas que parecem adicionadas ou removidas.", Icons.Default.CompareArrows)
                     "Traduzir PDF" -> {
@@ -343,7 +388,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
 
             Button(
                 onClick = { execute() },
-                enabled = !running && (selected != null || tool.title == "Criar PDF") && (if (needsTwo) selectedPaths.size >= 2 else true),
+                enabled = !running && (selected != null || tool.title in setOf("Criar PDF", "Detetar duplicados") || needsMultiple) && (if (needsMultiple) selectedPaths.size >= minimumSelection else true),
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = tool.color),
                 shape = RoundedCornerShape(14.dp)

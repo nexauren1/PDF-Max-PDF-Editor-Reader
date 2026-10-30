@@ -63,7 +63,13 @@ private val tools = listOf(
     ToolSpec("Imprimir PDF", "Preparar impressão", Icons.Default.Print, Color(0xFF7C70F5)),
     ToolSpec("Partilhar PDF", "Enviar documento", Icons.Default.Share, Color(0xFF16B89B)),
     ToolSpec("Ver propriedades", "Informações do ficheiro", Icons.Default.Info, Color(0xFF4F8FEA)),
-    ToolSpec("Remover páginas", "Eliminar páginas selecionadas", Icons.Default.Delete, Color(0xFFEB5A74))
+    ToolSpec("Remover páginas", "Eliminar páginas selecionadas", Icons.Default.Delete, Color(0xFFEB5A74)),
+    ToolSpec("Extrair texto PDF", "Guardar texto como TXT", Icons.Default.TextSnippet, Color(0xFF1CBCD0)),
+    ToolSpec("Criar ZIP", "Arquivar vários ficheiros", Icons.Default.FolderZip, Color(0xFFE2A33D)),
+    ToolSpec("Detetar duplicados", "Encontrar cópias exatas", Icons.Default.ContentCopy, Color(0xFF9B6BFF)),
+    ToolSpec("Extrair páginas", "Criar um PDF com páginas escolhidas", Icons.Default.Description, Color(0xFF398BFF)),
+    ToolSpec("Adicionar página em branco", "Inserir uma nova página", Icons.Default.NoteAdd, Color(0xFF16B89B)),
+    ToolSpec("Editar metadados", "Título, autor e palavras-chave", Icons.Default.EditNote, Color(0xFFFF8A45))
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

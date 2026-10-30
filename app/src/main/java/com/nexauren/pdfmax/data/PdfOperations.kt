@@ -262,12 +262,23 @@ object PdfOperations {
         return target
     }
 
-    fun recognizeImageToPdf(context: Context, imageFile: File): File {
-        val image = InputImage.fromFilePath(context, Uri.fromFile(imageFile))
+    fun recognizeImageToPdf(context: Context, imageFile: File): File =
+        recognizeImagesToPdf(context, listOf(imageFile))
+
+    /** Recognizes several scanned pages in one local OCR session and creates one searchable PDF. */
+    fun recognizeImagesToPdf(context: Context, imageFiles: List<File>): File {
+        require(imageFiles.isNotEmpty()) { "Selecione pelo menos uma imagem para OCR." }
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         return try {
-            val result = Tasks.await(recognizer.process(image))
-            createPdfFromText(context, imageFile.nameWithoutExtension + "_OCR", result.text)
+            val pages = imageFiles.mapIndexed { index, imageFile ->
+                require(imageFile.isFile && imageFile.canRead()) { "Não foi possível ler " + imageFile.name + "." }
+                val image = InputImage.fromFilePath(context, Uri.fromFile(imageFile))
+                val result = Tasks.await(recognizer.process(image))
+                "Página " + (index + 1) + "\n" + result.text
+            }
+            val text = pages.joinToString("\n\n")
+            require(text.isNotBlank()) { "O OCR não encontrou texto legível nas imagens selecionadas." }
+            createPdfFromText(context, imageFiles.first().nameWithoutExtension + "_OCR", text)
         } finally {
             recognizer.close()
         }

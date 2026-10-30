@@ -183,6 +183,57 @@ object AdvancedPdfOperations {
         return destination
     }
 
+    /** Inserts a blank A4 page after the requested page (0 means before page 1). */
+    fun insertBlankPage(context: Context, input: File, pageAfter: Int): File {
+        init(context)
+        val destination = target(input, "blank_page_added")
+        PDDocument.load(input).use { source ->
+            require(pageAfter in 0..source.numberOfPages) {
+                "A posição deve estar entre 0 e " + source.numberOfPages + "."
+            }
+            PDDocument().use { output ->
+                for (index in 0..source.numberOfPages) {
+                    if (index == pageAfter) {
+                        output.addPage(com.tom_roush.pdfbox.pdmodel.PDPage(
+                            com.tom_roush.pdfbox.pdmodel.common.PDRectangle.A4
+                        ))
+                    }
+                    if (index < source.numberOfPages) {
+                        output.importPage(source.getPage(index))
+                    }
+                }
+                output.save(destination)
+            }
+        }
+        return destination
+    }
+
+    /** Creates a separate PDF from the selected pages, preserving the entered order. */
+    fun extractPages(context: Context, input: File, pageNumbers: List<Int>): File {
+        return reorderPages(context, input, pageNumbers)
+    }
+
+    /** Updates common document metadata without changing the PDF page content. */
+    fun editMetadata(
+        context: Context,
+        input: File,
+        title: String,
+        author: String,
+        subject: String,
+        keywords: String
+    ): File {
+        init(context)
+        val destination = target(input, "metadata")
+        PDDocument.load(input).use { document ->
+            document.documentInformation.title = title.trim()
+            document.documentInformation.author = author.trim()
+            document.documentInformation.subject = subject.trim()
+            document.documentInformation.keywords = keywords.trim()
+            document.save(destination)
+        }
+        return destination
+    }
+
     private fun writeXlsx(target: File, lines: List<String>) {
         val rows = lines.mapIndexed { index, line ->
             val value = xmlEscape(line.take(32000))

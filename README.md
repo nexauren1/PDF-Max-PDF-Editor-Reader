@@ -30,12 +30,15 @@ On Android 11 and later, full device scanning requires the Android “All files 
 - Import and preview PDF pages with Android PdfRenderer.
 - Search/index supported files in the internal library.
 - Merge and split PDFs.
-- Reorder pages and remove selected pages.
+- Reorder, extract, remove selected pages and insert blank pages.
 - Rotate pages, add text overlays, watermarks and page numbering.
 - Set PDF open passwords.
 - Fill existing AcroForm text fields by field name.
 - Add a handwritten visual signature stamp to a PDF.
-- Extract text and images; convert PDF pages to images.
+- Extract text to UTF-8 TXT and images; convert PDF pages to images.
+- Batch-create a multi-page PDF from selected images and run batch OCR on several scans into one searchable PDF.
+- Create ZIP archives from selected documents and detect exact duplicate files with SHA-256 (no automatic deletion).
+- Edit PDF title, author, subject and keywords.
 - Create PDFs from text and images.
 - OCR from an image using on-device ML Kit.
 - Capture a document photo inside the app using CameraX, then run OCR.
