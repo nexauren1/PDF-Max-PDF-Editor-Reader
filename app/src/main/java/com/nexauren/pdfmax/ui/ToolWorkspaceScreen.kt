@@ -279,7 +279,16 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         }) }, minLines = 2, colors = toolFieldColors())
                     }
                     "Comprimir PDF" -> InfoLine(if (english) "PDFBox rewrites document streams without rasterizing pages." else "O PDFBox regrava os fluxos do documento sem rasterizar as páginas.", Icons.Default.Compress)
-                    "Digitalizar e OCR" -> InfoLine(if (english) "Select a scanned image. OCR recognizes text locally and creates a searchable PDF." else "Escolha uma imagem digitalizada. O OCR reconhece texto localmente e cria um PDF pesquisável.", Icons.Default.TextFields)
+                    "Digitalizar e OCR" -> {
+                        CameraCapturePanel(english) { captured ->
+                            scope.launch {
+                                documents = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
+                                selectedPath = captured.absolutePath
+                            }
+                        }
+                        Spacer(Modifier.height(9.dp))
+                        InfoLine(if (english) "Capture a page here or choose an existing image above. OCR runs locally and creates a searchable PDF." else "Capture uma página aqui ou escolha uma imagem existente acima. O OCR é executado localmente e cria um PDF pesquisável.", Icons.Default.TextFields)
+                    }
                     "Imagem para PDF" -> InfoLine(if (english) "The selected image will be placed on an A4 page." else "A imagem selecionada será colocada numa página A4.", Icons.Default.Image)
                     "Juntar PDF" -> InfoLine(if (english) "Selected PDFs are combined in the order shown in the library." else "Os PDFs selecionados são combinados pela ordem apresentada na biblioteca.", Icons.Default.MergeType)
                     "Comparar PDFs" -> InfoLine(if (english) "Compare extracted text and show lines that appear added or removed." else "Compare o texto extraído e mostre as linhas que parecem adicionadas ou removidas.", Icons.Default.CompareArrows)
