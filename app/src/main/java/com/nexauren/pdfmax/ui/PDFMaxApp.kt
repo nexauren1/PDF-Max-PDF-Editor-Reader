@@ -2,8 +2,6 @@ package com.nexauren.pdfmax.ui
 
 import android.net.Uri
 import java.io.File
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -74,14 +72,6 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            pdfUri = uri
-            pdfName = uri.lastPathSegment?.substringAfterLast('/') ?: "Documento.pdf"
-            runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            screen = Page.READER
-        }
-    }
     fun go(target: Page) { screen = target; scope.launch { drawer.close() } }
     fun openTool(tool: ToolSpec) { currentTool = tool; screen = tool.page }
 
@@ -104,7 +94,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                 BottomBar(
                     Modifier.fillMaxWidth(), screen, english,
                     { go(Page.HOME) }, { go(Page.FILES) },
-                    { picker.launch(arrayOf("application/pdf")) },
+                    { go(Page.FILES) },
                     { go(Page.TOOLS) }, { scope.launch { drawer.open() } }
                 )
             }

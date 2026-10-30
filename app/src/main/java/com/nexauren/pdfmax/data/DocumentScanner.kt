@@ -50,11 +50,18 @@ object DocumentScanner {
     }
 
     @Suppress("DEPRECATION")
-    fun scan(): List<IndexedDocument> {
-        val root = Environment.getExternalStorageDirectory()
+    fun scan(context: Context): List<IndexedDocument> {
+        val roots = buildList {
+            add(Environment.getExternalStorageDirectory())
+            context.getExternalFilesDirs(null).filterNotNull().forEach { appDir ->
+                var root: File? = appDir
+                repeat(4) { root = root?.parentFile }
+                root?.let { add(it) }
+            }
+        }.distinctBy { runCatching { it.canonicalPath }.getOrDefault(it.absolutePath) }
         val results = ArrayList<IndexedDocument>()
         val stack = ArrayDeque<Pair<File, Int>>()
-        stack.add(root to 0)
+        roots.forEach { stack.add(it to 0) }
         val maxFiles = 20_000
         val maxDepth = 12
         val supported = setOf("pdf", "doc", "docx", "odt", "rtf", "xls", "xlsx", "csv", "ods", "ppt", "pptx", "odp", "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "heic", "txt", "md", "log", "zip", "rar", "7z", "tar", "gz")
@@ -65,7 +72,12 @@ object DocumentScanner {
                 if (results.size >= maxFiles) break
                 if (child.isHidden || child.name.startsWith(".")) continue
                 if (child.isDirectory) {
-                    if (depth < maxDepth && child.name != "Android" && child.canRead()) stack.add(child to depth + 1)
+                    if (depth < maxDepth && child.name == "Android") {
+                        val media = File(child, "media")
+                        if (media.isDirectory && media.canRead()) stack.add(media to depth + 1)
+                    } else if (depth < maxDepth && child.canRead()) {
+                        stack.add(child to depth + 1)
+                    }
                 } else if (child.isFile && child.canRead() && child.extension.lowercase(Locale.ROOT) in supported) {
                     results.add(IndexedDocument(child))
                 }

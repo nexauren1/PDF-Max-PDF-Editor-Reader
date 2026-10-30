@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,7 +44,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
-fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
+internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
@@ -68,7 +70,7 @@ fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         if (!access) return
         loading = true
         scope.launch {
-            documents = withContext(Dispatchers.IO) { DocumentScanner.scan() }
+            documents = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
             if (selectedPath == null) selectedPath = documents.firstOrNull { it.kind == DocumentKind.PDF }?.file?.absolutePath
                 ?: documents.firstOrNull()?.file?.absolutePath
             loading = false
