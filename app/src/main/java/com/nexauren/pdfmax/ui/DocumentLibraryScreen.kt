@@ -42,6 +42,7 @@ import com.nexauren.pdfmax.data.OfficeTextExtractor
 import com.nexauren.pdfmax.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import android.graphics.BitmapFactory
@@ -68,7 +69,7 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
             return
         }
         if (loading) return
-        // Show the previous index immediately; refresh it in the background.
+        // Restore the persistent on-device index before checking for changes.
         DocumentScanner.cachedDocuments().takeIf { it.isNotEmpty() }?.let {
             files = it
             scanned = true
@@ -77,6 +78,11 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
         scanError = null
         scope.launch {
             val result = runCatching {
+                val savedIndex = withContext(Dispatchers.IO) { DocumentScanner.loadPersistent(context) }
+                if (files.isEmpty() && savedIndex.isNotEmpty()) {
+                    files = savedIndex
+                    scanned = true
+                }
                 withContext(Dispatchers.IO) { DocumentScanner.scan(context, forceRefresh) }
             }
             result.onSuccess {
@@ -103,7 +109,13 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
         } else permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
-    LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(Unit) {
+        refresh()
+        while (true) {
+            delay(DocumentScanner.REFRESH_INTERVAL_MS)
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) refresh()
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->

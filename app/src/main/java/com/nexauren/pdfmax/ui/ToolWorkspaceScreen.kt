@@ -45,6 +45,7 @@ import com.nexauren.pdfmax.data.DocumentUtilityOperations
 import com.nexauren.pdfmax.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -91,11 +92,13 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
             return
         }
         if (loading) return
-        // Keep the last known index visible while the background refresh runs.
+        // Restore the saved library first; processing tools never wait for a full scan to show it.
         DocumentScanner.cachedDocuments().takeIf { it.isNotEmpty() }?.let { documents = it }
         loading = true
         scope.launch {
             val result = runCatching {
+                val savedIndex = withContext(Dispatchers.IO) { DocumentScanner.loadPersistent(context) }
+                if (documents.isEmpty() && savedIndex.isNotEmpty()) documents = savedIndex
                 withContext(Dispatchers.IO) { DocumentScanner.scan(context, forceRefresh) }
             }
             result.onSuccess { indexed ->
@@ -122,7 +125,13 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         } else permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
-    LaunchedEffect(Unit) { refresh() }
+    LaunchedEffect(Unit) {
+        refresh()
+        while (true) {
+            delay(DocumentScanner.REFRESH_INTERVAL_MS)
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) refresh()
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->

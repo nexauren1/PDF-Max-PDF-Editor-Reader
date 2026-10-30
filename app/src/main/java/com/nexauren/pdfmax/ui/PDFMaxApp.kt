@@ -34,6 +34,7 @@ import com.nexauren.pdfmax.data.IndexedDocument
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 internal enum class Page { HOME, FILES, TOOLS, READER, OFFICE, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
 internal data class ToolSpec(val title: String, val subtitle: String, val icon: ImageVector, val color: Color, val page: Page = Page.TOOL)
@@ -178,11 +179,19 @@ private fun TopBar(screen: Page, english: Boolean, onMenu: () -> Unit, onBack: (
 
 @Composable
 private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) -> Unit, openPdf: () -> Unit, openFile: (File) -> Unit) {
+    val context = LocalContext.current
     var recentDocuments by remember { mutableStateOf(DocumentScanner.cachedDocuments().take(5)) }
     LaunchedEffect(Unit) {
-        // Do not scan the entire device on the home screen. The library indexes files
-        // when the user opens "My files"; the dashboard only reads the warm cache.
-        recentDocuments = DocumentScanner.cachedDocuments().take(5)
+        // Load the saved library first, then refresh MediaStore in the background.
+        val saved = withContext(Dispatchers.IO) { DocumentScanner.loadPersistent(context) }
+        recentDocuments = saved.take(5)
+        val latest = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
+        recentDocuments = latest.take(5)
+        while (true) {
+            delay(DocumentScanner.REFRESH_INTERVAL_MS)
+            val updated = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
+            recentDocuments = updated.take(5)
+        }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp, vertical = 5.dp)) {
         Text(if (en) "Hello, welcome back" else "Olá, bem-vindo!", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
