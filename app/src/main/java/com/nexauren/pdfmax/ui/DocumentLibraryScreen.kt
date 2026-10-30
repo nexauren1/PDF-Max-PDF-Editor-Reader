@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -56,26 +57,43 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("All") }
     var scanned by remember { mutableStateOf(false) }
+    var scanError by remember { mutableStateOf<String?>(null) }
+    var awaitingPermissionReturn by remember { mutableStateOf(false) }
 
-    fun refresh() {
+    fun refresh(forceRefresh: Boolean = false) {
         access = DocumentScanner.hasAccess(context)
-        if (!access) return
-        loading = true
-        scope.launch {
-            files = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
+        if (!access) {
+            files = emptyList()
             loading = false
-            scanned = true
+            return
+        }
+        if (loading) return
+        loading = true
+        scanError = null
+        scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) { DocumentScanner.scan(context, forceRefresh) }
+            }
+            result.onSuccess {
+                files = it
+                scanned = true
+            }.onFailure {
+                scanError = it.message ?: if (english) "The document index could not be read." else "Não foi possível ler o índice de documentos."
+                scanned = true
+            }
+            loading = false
         }
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh(true) }
     fun requestAccess() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            awaitingPermissionReturn = true
             val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
                 data = Uri.parse("package:" + context.packageName)
             }
             runCatching { context.startActivity(intent) }.onFailure {
-                context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
             }
         } else permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
@@ -83,7 +101,12 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
     LaunchedEffect(Unit) { refresh() }
 
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) refresh() }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && awaitingPermissionReturn) {
+                awaitingPermissionReturn = false
+                refresh(forceRefresh = true)
+            }
+        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
@@ -116,7 +139,7 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
                     color = MaxMuted, fontSize = 11.sp
                 )
             }
-            IconButton(onClick = { refresh() }, enabled = access && !loading) { Icon(Icons.Default.Refresh, null, tint = MaxCyan) }
+            IconButton(onClick = { refresh(forceRefresh = true) }, enabled = access && !loading) { Icon(Icons.Default.Refresh, null, tint = MaxCyan) }
             if (loading) CircularProgressIndicator(Modifier.size(20.dp), color = MaxCyan, strokeWidth = 2.dp)
         }
         Spacer(Modifier.height(13.dp))
@@ -137,7 +160,7 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
             }
         }
         Spacer(Modifier.height(11.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
             listOf("All", "PDF", "Word", "Excel", "PPT", "Images").forEach { label ->
                 val selected = filter == label
                 Box(Modifier.clip(CircleShape).background(if (selected) Color(0xFF087EEB) else Color(0xFF172A47)).clickable { filter = label }.padding(horizontal = 12.dp, vertical = 8.dp)) {
@@ -152,6 +175,8 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
         Spacer(Modifier.height(12.dp))
         if (!access) {
             AccessCard(english, onRequest = { requestAccess() })
+        } else if (scanError != null && files.isEmpty()) {
+            ScanErrorCard(english, scanError.orEmpty()) { refresh(forceRefresh = true) }
         } else if (loading && files.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -163,7 +188,12 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
         } else if (visible.isEmpty()) {
             EmptyFilesCard(english, query.isNotBlank() || scanned)
         } else {
-            Text(visible.size.toString() + if (english) " RESULTS" else " RESULTADOS", color = MaxMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 7.dp))
+            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(bottom = 6.dp), color = MaxCyan)
+            Text(
+                visible.size.toString() + if (english) " RESULTS" else " RESULTADOS",
+                color = MaxMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 7.dp)
+            )
             LazyColumn(contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 items(visible, key = { it.file.absolutePath }) { item -> DocumentRow(item) { onOpenFile(item.file) } }
             }
@@ -188,6 +218,26 @@ private fun AccessCard(english: Boolean, onRequest: () -> Unit) {
             Text(if (english) "Grant file access" else "Permitir acesso aos ficheiros")
         }
         Text(if (english) "Android will ask you to allow access in system settings." else "O Android pedirá autorização nas definições do sistema.", color = Color(0xFF8295B4), fontSize = 9.sp)
+    }
+}
+
+@Composable
+private fun ScanErrorCard(english: Boolean, message: String, retry: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF2B1B2B)).padding(16.dp)
+    ) {
+        Icon(Icons.Default.WarningAmber, null, tint = Color(0xFFFFB15B), modifier = Modifier.size(32.dp))
+        Spacer(Modifier.height(8.dp))
+        Text(if (english) "Could not scan storage" else "Não foi possível analisar o armazenamento", color = Color.White, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(5.dp))
+        Text(message, color = MaxMuted, fontSize = 11.sp)
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = retry, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF087FF1))) {
+            Icon(Icons.Default.Refresh, null)
+            Spacer(Modifier.width(7.dp))
+            Text(if (english) "Try again" else "Tentar novamente")
+        }
     }
 }
 

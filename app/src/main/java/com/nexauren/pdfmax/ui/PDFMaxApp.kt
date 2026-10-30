@@ -178,12 +178,11 @@ private fun TopBar(screen: Page, english: Boolean, onMenu: () -> Unit, onBack: (
 
 @Composable
 private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) -> Unit, openPdf: () -> Unit, openFile: (File) -> Unit) {
-    val context = LocalContext.current
-    var recentDocuments by remember { mutableStateOf<List<IndexedDocument>>(emptyList()) }
+    var recentDocuments by remember { mutableStateOf(DocumentScanner.cachedDocuments().take(5)) }
     LaunchedEffect(Unit) {
-        if (DocumentScanner.hasAccess(context)) {
-            recentDocuments = withContext(Dispatchers.IO) { DocumentScanner.scan(context).take(5) }
-        }
+        // Do not scan the entire device on the home screen. The library indexes files
+        // when the user opens "My files"; the dashboard only reads the warm cache.
+        recentDocuments = DocumentScanner.cachedDocuments().take(5)
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp, vertical = 5.dp)) {
         Text(if (en) "Hello, welcome back" else "Olá, bem-vindo!", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)

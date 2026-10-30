@@ -81,31 +81,54 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     var rotation by remember { mutableIntStateOf(90) }
     var exportFormat by remember { mutableStateOf("Word") }
     var showAll by remember { mutableStateOf(false) }
+    var awaitingPermissionReturn by remember { mutableStateOf(false) }
 
-    fun refresh() {
+    fun refresh(forceRefresh: Boolean = false) {
         access = DocumentScanner.hasAccess(context)
-        if (!access) return
+        if (!access) {
+            documents = emptyList()
+            loading = false
+            return
+        }
+        if (loading) return
         loading = true
         scope.launch {
-            documents = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
-            if (selectedPath == null) selectedPath = documents.firstOrNull { it.kind == DocumentKind.PDF }?.file?.absolutePath
-                ?: documents.firstOrNull()?.file?.absolutePath
+            val result = runCatching {
+                withContext(Dispatchers.IO) { DocumentScanner.scan(context, forceRefresh) }
+            }
+            result.onSuccess { indexed ->
+                documents = indexed
+                if (selectedPath == null || indexed.none { it.file.absolutePath == selectedPath }) {
+                    selectedPath = indexed.firstOrNull { it.kind == DocumentKind.PDF }?.file?.absolutePath
+                        ?: indexed.firstOrNull()?.file?.absolutePath
+                }
+            }.onFailure {
+                outputMessage = (if (english) "Could not index storage: " else "Não foi possível indexar o armazenamento: ") + (it.message ?: "erro")
+            }
             loading = false
         }
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh() }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refresh(true) }
     fun requestAccess() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            awaitingPermissionReturn = true
             val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply { data = Uri.parse("package:" + context.packageName) }
-            runCatching { context.startActivity(intent) }.onFailure { context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+            runCatching { context.startActivity(intent) }.onFailure {
+                runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+            }
         } else permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
     LaunchedEffect(Unit) { refresh() }
 
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) refresh() }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && awaitingPermissionReturn) {
+                awaitingPermissionReturn = false
+                refresh(forceRefresh = true)
+            }
+        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
@@ -120,7 +143,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         "Criar ZIP", "Detetar duplicados" -> documents
         else -> documents
     }
-    val visible = eligible.filter { it.name.contains(query, true) }.take(if (showAll) 100 else 6)
+    val visible = eligible.filter { item -> query.isBlank() || item.name.contains(query, true) || item.file.parent.orEmpty().contains(query, true) || item.extension.contains(query.removePrefix("."), true) }.take(if (showAll) 300 else 8)
 
     fun execute() {
         val file = selected
@@ -201,7 +224,8 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
             result.onSuccess { produced ->
                 resultFiles = produced
                 if (produced.isNotEmpty()) outputMessage = if (english) "Completed. Saved in Documents/PDF Max." else "Concluído. Guardado em Documentos/PDF Max."
-                refresh()
+                if (produced.isNotEmpty()) DocumentScanner.invalidate()
+                refresh(forceRefresh = produced.isNotEmpty())
             }.onFailure {
                 outputMessage = (if (english) "Could not complete: " else "Não foi possível concluir: ") + (it.message ?: "erro desconhecido")
             }
@@ -276,7 +300,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                     }
                     if (visible.isEmpty()) Text(if (english) "No compatible files were found. Check the file library." else "Não foram encontrados ficheiros compatíveis. Verifique a biblioteca.", color = MaxMuted, fontSize = 11.sp)
                 }
-                if (eligible.size > 6) TextButton(onClick = { showAll = !showAll }) { Text(if (showAll) "Mostrar menos" else "Mostrar mais ficheiros", color = MaxCyan) }
+                if (eligible.size > 8) TextButton(onClick = { showAll = !showAll }) { Text(if (showAll) "Mostrar menos" else "Mostrar mais ficheiros (" + eligible.size + ")", color = MaxCyan) }
             }
 
             ToolPanel(if (english) "2 · Options" else "2 · Opções", tool.color) {
@@ -335,7 +359,9 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                     "Digitalizar e OCR" -> {
                         CameraCapturePanel(english) { captured ->
                             scope.launch {
-                                documents = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
+                                val capturedDocument = IndexedDocument(captured)
+                                documents = (documents.filterNot { it.file.absolutePath == captured.absolutePath } + capturedDocument)
+                                    .sortedByDescending { it.modified }
                                 selectedPath = captured.absolutePath
                                 selectedPaths = selectedPaths + captured.absolutePath
                             }
