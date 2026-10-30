@@ -37,6 +37,7 @@ import com.nexauren.pdfmax.data.DocumentKind
 import com.nexauren.pdfmax.data.DocumentScanner
 import com.nexauren.pdfmax.data.IndexedDocument
 import com.nexauren.pdfmax.data.PdfOperations
+import com.nexauren.pdfmax.data.DocumentActions
 import com.nexauren.pdfmax.data.AdvancedPdfOperations
 import com.nexauren.pdfmax.data.OfficeExportOperations
 import com.nexauren.pdfmax.ui.theme.*
@@ -164,7 +165,15 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         "Preencher formulários" -> listOf(AdvancedPdfOperations.fillFormField(context, file!!, formFieldName, formFieldValue))
                         "Traduzir PDF" -> error(if (english) "Translation service is not configured. Your document has not been uploaded anywhere." else "O serviço de tradução não está configurado. O documento não foi enviado para lado nenhum.")
                         "Preencher formulários" -> error(if (english) "The form editor is not available yet." else "O editor de formulários ainda não está disponível.")
-                        "Imprimir PDF", "Partilhar PDF" -> error(if (english) "Use the PDF reader's share/print controls for this document." else "Use os controlos de partilha/impressão do leitor para este documento.")
+                        "Imprimir PDF" -> {
+                            withContext(Dispatchers.Main) { DocumentActions.print(context, file!!) }
+                            emptyList()
+                        }
+                        "Partilhar PDF" -> {
+                            val sharedCopy = withContext(Dispatchers.IO) { DocumentActions.createShareCopy(context, file!!) }
+                            withContext(Dispatchers.Main) { DocumentActions.share(context, sharedCopy) }
+                            emptyList()
+                        }
                         else -> error(if (english) "This tool is not connected yet." else "Esta ferramenta ainda não está ligada.")
                     }
                 }
