@@ -3,6 +3,8 @@ package com.nexauren.pdfmax.ui
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.os.ParcelFileDescriptor
+import java.io.File
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -33,8 +35,11 @@ fun PdfPagePreview(uri: Uri?, modifier: Modifier = Modifier) {
         if (uri != null) {
             bitmap = withContext(Dispatchers.IO) {
                 try {
-                    val descriptor = context.contentResolver.openFileDescriptor(uri, "r")
-                        ?: return@withContext null
+                    val descriptor = if (uri.scheme == "file") {
+                        uri.path?.let { ParcelFileDescriptor.open(File(it), ParcelFileDescriptor.MODE_READ_ONLY) }
+                    } else {
+                        context.contentResolver.openFileDescriptor(uri, "r")
+                    } ?: return@withContext null
                     descriptor.use { pfd ->
                         val renderer = PdfRenderer(pfd)
                         try {

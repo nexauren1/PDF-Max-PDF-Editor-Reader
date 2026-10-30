@@ -1,6 +1,7 @@
 package com.nexauren.pdfmax.ui
 
 import android.net.Uri
+import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -31,8 +32,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.nexauren.pdfmax.ui.theme.*
 import kotlinx.coroutines.launch
 
-private enum class Page { HOME, FILES, TOOLS, READER, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
-private data class ToolSpec(val title: String, val subtitle: String, val icon: ImageVector, val color: Color, val page: Page = Page.TOOL)
+internal enum class Page { HOME, FILES, TOOLS, READER, OFFICE, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
+internal data class ToolSpec(val title: String, val subtitle: String, val icon: ImageVector, val color: Color, val page: Page = Page.TOOL)
 
 private val tools = listOf(
     ToolSpec("Editar PDF", "Texto, imagens e notas", Icons.Default.Edit, Color(0xFF9257FF), Page.EDITOR),
@@ -67,6 +68,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
     var screen by remember { mutableStateOf(if (initialPdf == null) Page.HOME else Page.READER) }
     var currentTool by remember { mutableStateOf(tools[0]) }
     var pdfUri by remember { mutableStateOf(initialPdf) }
+    var selectedFile by remember { mutableStateOf<File?>(null) }
     var pdfName by remember { mutableStateOf("Relatório_Final.pdf") }
     var english by remember { mutableStateOf(false) }
     val drawer = rememberDrawerState(DrawerValue.Closed)
@@ -114,15 +116,21 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                 TopBar(screen, english, { scope.launch { drawer.open() } }, { go(Page.HOME) }, { go(Page.SETTINGS) })
                 when (screen) {
                     Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { picker.launch(arrayOf("application/pdf")) })
-                    Page.FILES -> FilesPage(english, pdfName, { picker.launch(arrayOf("application/pdf")) }, { go(Page.READER) })
+                    Page.FILES -> DocumentLibraryScreen(english) { file ->
+                        selectedFile = file
+                        pdfName = file.name
+                        pdfUri = Uri.fromFile(file)
+                        screen = if (file.extension.equals("pdf", true)) Page.READER else Page.OFFICE
+                    }
+                    Page.OFFICE -> OfficePreviewScreen(selectedFile, english) { go(Page.FILES) }
                     Page.TOOLS -> ToolsPage(english, { openTool(it) })
                     Page.READER -> ReaderPage(english, pdfName, pdfUri, { picker.launch(arrayOf("application/pdf")) }, { go(Page.EDITOR) }, { openTool(it) })
-                    Page.EDITOR -> EditorPage(english, pdfUri, { picker.launch(arrayOf("application/pdf")) }, { openTool(it) })
-                    Page.CONVERTER -> ConverterPage(english, pdfName, { picker.launch(arrayOf("application/pdf")) })
-                    Page.SCANNER -> ScannerPage(english)
-                    Page.PROTECT -> ProtectPage(english)
+                    Page.EDITOR -> ToolWorkspaceScreen(tools[0], english)
+                    Page.CONVERTER -> ToolWorkspaceScreen(tools[1], english)
+                    Page.SCANNER -> ToolWorkspaceScreen(tools[7], english)
+                    Page.PROTECT -> ToolWorkspaceScreen(tools[5], english)
                     Page.SETTINGS -> SettingsPage(english, { english = !english })
-                    Page.TOOL -> ToolDetailPage(currentTool, english, { picker.launch(arrayOf("application/pdf")) })
+                    Page.TOOL -> ToolWorkspaceScreen(currentTool, english)
                 }
             }
         }
