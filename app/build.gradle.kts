@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.nexauren.pdfmax"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.nexauren.pdfmax"
