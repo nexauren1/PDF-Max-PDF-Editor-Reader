@@ -191,7 +191,10 @@ object DocumentScanner {
                 cachedFiles.forEach { found[it.file.absolutePath] = it }
             }
 
-            val rowsRead = queryMediaStore(appContext, found, modifiedAfter)
+            var rowsRead = queryMediaStore(appContext, found, modifiedAfter, extensionFilter = true)
+            if (rowsRead == 0) {
+                rowsRead = queryMediaStore(appContext, found, modifiedAfter, extensionFilter = false)
+            }
             val mediaStoreWorked = rowsRead >= 0
             val lastFallback = prefs.getLong(PREF_LAST_FALLBACK, 0L)
             val shouldFallback = found.isEmpty() ||
@@ -211,6 +214,10 @@ object DocumentScanner {
             }
 
             val result = found.values.sortedByDescending { it.modified }
+            if (mediaStoreWorked && result.isEmpty() && cachedFiles.isNotEmpty()) {
+                cachedAt = now
+                return cachedFiles
+            }
             if (mediaStoreWorked) {
                 cachedFiles = result
                 cachedAt = now
@@ -274,7 +281,8 @@ object DocumentScanner {
     private fun queryMediaStore(
         context: Context,
         destination: MutableMap<String, IndexedDocument>,
-        modifiedAfterMillis: Long?
+        modifiedAfterMillis: Long?,
+        extensionFilter: Boolean
     ): Int {
         val collection = MediaStore.Files.getContentUri("external")
         val projection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -293,14 +301,18 @@ object DocumentScanner {
             )
         }
 
-        val extensionSelection = supportedExtensions.joinToString(" OR ") {
-            "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
+        val extensionSelection = if (extensionFilter) {
+            supportedExtensions.joinToString(" OR ") {
+                "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
+            }
+        } else {
+            "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE '%._%'"
         }
         val selection = if (modifiedAfterMillis != null) {
             "($extensionSelection) AND ${MediaStore.MediaColumns.DATE_MODIFIED} >= ?"
         } else extensionSelection
         val args = ArrayList<String>(supportedExtensions.size + 1).apply {
-            addAll(supportedExtensions.map { "%.$it" })
+            if (extensionFilter) addAll(supportedExtensions.map { "%.$it" })
             if (modifiedAfterMillis != null) add((modifiedAfterMillis / 1000L).toString())
         }
         val cancellation = CancellationSignal()
@@ -328,7 +340,12 @@ object DocumentScanner {
                 if (nameColumn < 0) return@use -1
 
                 var count = 0
-                while (cursor.moveToNext() && count < MAX_MEDIASTORE_RESULTS) {
+                var visited = 0
+                while (cursor.moveToNext() &&
+                    count < MAX_MEDIASTORE_RESULTS &&
+                    visited < 100_000
+                ) {
+                    visited++
                     val name = cursor.getString(nameColumn)?.takeIf { it.isNotBlank() } ?: continue
                     val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
                     if (extension !in supportedExtensions) continue
@@ -380,6 +397,7 @@ object DocumentScanner {
     ) {
         val storageRoot = Environment.getExternalStorageDirectory()
         val roots = linkedSetOf(
+            storageRoot,
             File(storageRoot, Environment.DIRECTORY_DOWNLOADS),
             File(storageRoot, Environment.DIRECTORY_DOCUMENTS),
             File(storageRoot, Environment.DIRECTORY_DCIM),

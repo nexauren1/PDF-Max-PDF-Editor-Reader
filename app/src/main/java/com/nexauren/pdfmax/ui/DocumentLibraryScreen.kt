@@ -60,6 +60,7 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
     var scanned by remember { mutableStateOf(false) }
     var scanError by remember { mutableStateOf<String?>(null) }
     var awaitingPermissionReturn by remember { mutableStateOf(false) }
+    var showAccessDialog by remember { mutableStateOf(false) }
 
     fun refresh(forceRefresh: Boolean = false) {
         access = DocumentScanner.hasAccess(context)
@@ -111,6 +112,7 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
 
     LaunchedEffect(Unit) {
         refresh()
+        if (!DocumentScanner.hasAccess(context)) showAccessDialog = true
         while (true) {
             delay(DocumentScanner.REFRESH_INTERVAL_MS)
             if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) refresh()
@@ -203,7 +205,12 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
                 }
             }
         } else if (visible.isEmpty()) {
-            EmptyFilesCard(english, query.isNotBlank() || scanned)
+            EmptyFilesCard(
+                english = english,
+                searched = query.isNotBlank() || scanned,
+                onGrantAccess = { requestAccess() },
+                onRescan = { refresh(forceRefresh = true) }
+            )
         } else {
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(bottom = 6.dp), color = MaxCyan)
             Text(
@@ -215,6 +222,38 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
                 items(visible, key = { it.file.absolutePath }) { item -> DocumentRow(item) { onOpenFile(item.file) } }
             }
         }
+    }
+
+    if (showAccessDialog && !access) {
+        AlertDialog(
+            onDismissRequest = { showAccessDialog = false },
+            title = {
+                Text(
+                    if (english) "Allow PDF Max to find your documents?" else "Permitir que o PDF Max encontre os seus documentos?",
+                    color = Color.White
+                )
+            },
+            text = {
+                Text(
+                    if (english) "Android requires a special “All files access” permission to discover PDFs, Word, Excel and other documents stored on your device. Your files remain on your phone." else "O Android exige uma autorização especial de “Acesso a todos os ficheiros” para encontrar PDFs, Word, Excel e outros documentos guardados no telemóvel. Os seus ficheiros permanecem no dispositivo.",
+                    color = MaxMuted
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showAccessDialog = false
+                    requestAccess()
+                }) {
+                    Text(if (english) "Open permission settings" else "Abrir definições de permissão", color = MaxCyan)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAccessDialog = false }) {
+                    Text(if (english) "Not now" else "Agora não", color = MaxMuted)
+                }
+            },
+            containerColor = Color(0xFF102541)
+        )
     }
 }
 
@@ -259,12 +298,47 @@ private fun ScanErrorCard(english: Boolean, message: String, retry: () -> Unit) 
 }
 
 @Composable
-private fun EmptyFilesCard(english: Boolean, searched: Boolean) {
-    Column(Modifier.fillMaxWidth().padding(top = 35.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+private fun EmptyFilesCard(
+    english: Boolean,
+    searched: Boolean,
+    onGrantAccess: () -> Unit,
+    onRescan: () -> Unit
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Icon(Icons.Default.FolderOff, null, tint = Color(0xFF58708F), modifier = Modifier.size(43.dp))
         Spacer(Modifier.height(10.dp))
-        Text(if (searched) { if (english) "No matching documents" else "Nenhum documento encontrado" } else { if (english) "No documents found yet" else "Ainda não foram encontrados documentos" }, color = Color.White, fontWeight = FontWeight.SemiBold)
-        Text(if (english) "Try another search or scan again." else "Experimente outra pesquisa ou volte a analisar.", color = MaxMuted, fontSize = 11.sp)
+        Text(
+            if (searched) {
+                if (english) "No documents were indexed" else "Ainda não foram indexados documentos"
+            } else {
+                if (english) "No documents found yet" else "Ainda não foram encontrados documentos"
+            },
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(5.dp))
+        Text(
+            if (english) "Check that PDF Max has “All files access” in Android Settings. Then run a full scan." else "Confirme nas Definições do Android se o PDF Max tem “Acesso a todos os ficheiros”. Depois faça uma análise completa.",
+            color = MaxMuted,
+            fontSize = 11.sp,
+            lineHeight = 16.sp
+        )
+        Spacer(Modifier.height(13.dp))
+        Button(
+            onClick = onGrantAccess,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF087FF1)),
+            shape = RoundedCornerShape(11.dp)
+        ) {
+            Icon(Icons.Default.Security, null)
+            Spacer(Modifier.width(7.dp))
+            Text(if (english) "Check file permission" else "Verificar permissão de ficheiros")
+        }
+        TextButton(onClick = onRescan) {
+            Text(if (english) "Scan storage again" else "Analisar armazenamento novamente", color = MaxCyan)
+        }
     }
 }
 
