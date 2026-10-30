@@ -67,6 +67,7 @@ object DocumentScanner {
     private const val PREFS = "pdfmax_document_index_v2"
     private const val PREF_DOCUMENTS = "documents_json"
     private const val PREF_LAST_SCAN = "last_scan_epoch"
+    private const val PREF_LAST_FULL_SCAN = "last_full_scan_epoch"
     private const val PREF_LAST_FALLBACK = "last_fallback_epoch"
     private const val FALLBACK_INTERVAL_MS = 5 * 60 * 1000L
 
@@ -176,26 +177,60 @@ object DocumentScanner {
                 return cachedFiles
             }
 
-            val found = LinkedHashMap<String, IndexedDocument>()
-            val mediaStoreWorked = queryMediaStore(appContext, found)
-
             val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val lastScanAt = prefs.getLong(PREF_LAST_SCAN, 0L)
+            val lastFullScanAt = prefs.getLong(PREF_LAST_FULL_SCAN, 0L)
+            // A full reconciliation is only needed on first run, manual refresh,
+            // or every five minutes. Normal 20-second checks fetch only changed rows.
+            val fullScan = forceRefresh || lastFullScanAt == 0L ||
+                now - lastFullScanAt >= FALLBACK_INTERVAL_MS
+            val modifiedAfter = if (fullScan) null else (lastScanAt - 90_000L).coerceAtLeast(0L)
+
+            val found = LinkedHashMap<String, IndexedDocument>()
+            if (!fullScan) {
+                cachedFiles.forEach { found[it.file.absolutePath] = it }
+            }
+
+            val rowsRead = queryMediaStore(appContext, found, modifiedAfter)
+            val mediaStoreWorked = rowsRead >= 0
             val lastFallback = prefs.getLong(PREF_LAST_FALLBACK, 0L)
             val shouldFallback = found.isEmpty() ||
-                (lastFallback == 0L || now - lastFallback >= FALLBACK_INTERVAL_MS)
+                lastFallback == 0L || now - lastFallback >= FALLBACK_INTERVAL_MS
 
             if (shouldFallback) {
                 scanKnownFolders(appContext, found)
                 prefs.edit().putLong(PREF_LAST_FALLBACK, now).apply()
             }
 
+            // Nothing changed on the incremental pass: keep the saved index and
+            // only advance the last-check timestamp. Avoid rewriting a large JSON cache.
+            if (!fullScan && mediaStoreWorked && rowsRead == 0 && !shouldFallback) {
+                cachedAt = now
+                prefs.edit().putLong(PREF_LAST_SCAN, now).apply()
+                return cachedFiles
+            }
+
             val result = found.values.sortedByDescending { it.modified }
-            // Do not erase a good saved library if both catalogue sources temporarily fail.
-            if (result.isNotEmpty() || mediaStoreWorked) {
+            if (mediaStoreWorked) {
                 cachedFiles = result
                 cachedAt = now
                 cacheReady = true
-                persistIndex(appContext, result, now)
+                persistIndex(
+                    appContext,
+                    result,
+                    now,
+                    if (fullScan) now else lastFullScanAt
+                )
+                return result
+            }
+
+            // If MediaStore is temporarily unavailable, preserve the old library.
+            // A folder fallback may still add new files, but the next check retries MediaStore.
+            if (result.isNotEmpty() && result.size != cachedFiles.size) {
+                cachedFiles = result
+                cacheReady = true
+                cachedAt = now
+                persistIndex(appContext, result, lastScanAt, lastFullScanAt)
                 return result
             }
 
@@ -206,7 +241,12 @@ object DocumentScanner {
         }
     }
 
-    private fun persistIndex(context: Context, documents: List<IndexedDocument>, timestamp: Long) {
+    private fun persistIndex(
+        context: Context,
+        documents: List<IndexedDocument>,
+        timestamp: Long,
+        fullScanTimestamp: Long
+    ) {
         try {
             val json = JSONArray()
             documents.take(MAX_MEDIASTORE_RESULTS).forEach { document ->
@@ -223,6 +263,7 @@ object DocumentScanner {
                 .edit()
                 .putString(PREF_DOCUMENTS, json.toString())
                 .putLong(PREF_LAST_SCAN, timestamp)
+                .putLong(PREF_LAST_FULL_SCAN, fullScanTimestamp)
                 .apply()
         } catch (_: Exception) {
             // A failed cache write must never prevent the library from being used.
@@ -232,8 +273,9 @@ object DocumentScanner {
     @Suppress("DEPRECATION")
     private fun queryMediaStore(
         context: Context,
-        destination: MutableMap<String, IndexedDocument>
-    ): Boolean {
+        destination: MutableMap<String, IndexedDocument>,
+        modifiedAfterMillis: Long?
+    ): Int {
         val collection = MediaStore.Files.getContentUri("external")
         val projection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             arrayOf(
@@ -251,11 +293,16 @@ object DocumentScanner {
             )
         }
 
-        val selection = supportedExtensions.joinToString(" OR ") {
+        val extensionSelection = supportedExtensions.joinToString(" OR ") {
             "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
         }
-        val selectionArgs = supportedExtensions.map { "%.$it" }.toTypedArray()
-        val sortOrder = "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
+        val selection = if (modifiedAfterMillis != null) {
+            "($extensionSelection) AND ${MediaStore.MediaColumns.DATE_MODIFIED} >= ?"
+        } else extensionSelection
+        val args = ArrayList<String>(supportedExtensions.size + 1).apply {
+            addAll(supportedExtensions.map { "%.$it" })
+            if (modifiedAfterMillis != null) add((modifiedAfterMillis / 1000L).toString())
+        }
         val cancellation = CancellationSignal()
         val handler = Handler(Looper.getMainLooper())
         val timeout = Runnable { cancellation.cancel() }
@@ -266,8 +313,8 @@ object DocumentScanner {
                 collection,
                 projection,
                 selection,
-                selectionArgs,
-                sortOrder,
+                args.toTypedArray(),
+                "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
                 cancellation
             )?.use { cursor ->
                 val dataColumn = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
@@ -278,7 +325,7 @@ object DocumentScanner {
                     cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
                 } else -1
 
-                if (nameColumn < 0) return@use false
+                if (nameColumn < 0) return@use -1
 
                 var count = 0
                 while (cursor.moveToNext() && count < MAX_MEDIASTORE_RESULTS) {
@@ -311,16 +358,16 @@ object DocumentScanner {
                     )
                     count++
                 }
-                true
-            } ?: false
+                count
+            } ?: -1
         } catch (_: SecurityException) {
-            false
+            -1
         } catch (_: IllegalArgumentException) {
-            false
+            -1
         } catch (_: android.os.OperationCanceledException) {
-            false
+            -1
         } catch (_: RuntimeException) {
-            false
+            -1
         } finally {
             handler.removeCallbacks(timeout)
         }
