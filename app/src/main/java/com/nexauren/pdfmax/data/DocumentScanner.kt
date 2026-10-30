@@ -24,8 +24,8 @@ data class IndexedDocument(
     val file: File,
     val name: String = file.name,
     val extension: String = file.extension.lowercase(Locale.ROOT),
-    val size: Long = 0L,
-    val modified: Long = 0L,
+    val size: Long = file.length(),
+    val modified: Long = file.lastModified(),
     val kind: DocumentKind = classify(file.extension)
 ) {
     companion object {

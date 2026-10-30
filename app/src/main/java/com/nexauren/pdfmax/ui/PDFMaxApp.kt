@@ -27,6 +27,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nexauren.pdfmax.ui.theme.*
 import com.nexauren.pdfmax.data.DocumentKind
 import com.nexauren.pdfmax.data.DocumentScanner
@@ -180,6 +182,7 @@ private fun TopBar(screen: Page, english: Boolean, onMenu: () -> Unit, onBack: (
 @Composable
 private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) -> Unit, openPdf: () -> Unit, openFile: (File) -> Unit) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var recentDocuments by remember { mutableStateOf(DocumentScanner.cachedDocuments().take(5)) }
     LaunchedEffect(Unit) {
         // Load the saved library first, then refresh MediaStore in the background.
@@ -189,8 +192,10 @@ private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) 
         recentDocuments = latest.take(5)
         while (true) {
             delay(DocumentScanner.REFRESH_INTERVAL_MS)
-            val updated = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
-            recentDocuments = updated.take(5)
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                val updated = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
+                recentDocuments = updated.take(5)
+            }
         }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp, vertical = 5.dp)) {
