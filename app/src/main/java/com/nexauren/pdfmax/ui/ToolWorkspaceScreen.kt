@@ -311,6 +311,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         if (saving || resultSaved || resultFiles.isEmpty()) return
         scope.launch {
             saving = true
+            val pendingResults = resultFiles.toList()
             val saveAttempt = runCatching {
                 withContext(Dispatchers.IO) {
                     val outputDirectory = PdfOperations.outputDirectory()
@@ -343,7 +344,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                     "Guardado com sucesso em Documentos/PDF Max."
                 }
                 withContext(Dispatchers.IO) {
-                    resultFiles.mapNotNull { it.parentFile }
+                    pendingResults.mapNotNull { it.parentFile }
                         .distinctBy { it.absolutePath }
                         .filter { it.name.startsWith("pdfmax_pending_") }
                         .forEach { it.deleteRecursively() }
@@ -547,7 +548,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                     resultFailed = false
                     resultSaved = false
                     selectedPaths = emptySet()
-                    selected = null
+                    selectedPath = null
                 },
                 modifier = Modifier.fillMaxWidth().height(49.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF31547A)),
