@@ -445,7 +445,6 @@ private fun FilesPage(en: Boolean, fileName: String, openPdf: () -> Unit, openRe
     }
 }
 
-@Composable
 private fun toolCategory(title: String): String = when (title) {
     "Editar PDF", "Adicionar texto", "Marca de água", "Assinar PDF", "Preencher formulários", "Editar metadados" -> "Edit"
     "Juntar PDF", "Dividir PDF", "Organizar páginas", "Remover páginas", "Extrair páginas",
@@ -456,6 +455,7 @@ private fun toolCategory(title: String): String = when (title) {
     else -> "Utilities"
 }
 
+@Composable
 private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
     var query by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
