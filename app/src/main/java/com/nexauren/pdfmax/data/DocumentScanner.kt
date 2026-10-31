@@ -15,6 +15,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.locks.ReentrantLock
 
 enum class DocumentKind(val labelPt: String, val labelEn: String) {
     PDF("PDF", "PDF"), WORD("Word", "Word"), EXCEL("Excel", "Excel"),
@@ -72,6 +73,7 @@ object DocumentScanner {
     private const val PREF_LAST_SCAN = "last_scan_epoch"
     private const val PREF_LAST_FULL_SCAN = "last_full_scan_epoch"
     private const val PREF_LAST_FALLBACK = "last_fallback_epoch"
+    private const val PREF_LAST_DIAGNOSTIC = "last_scan_diagnostic"
     private const val FALLBACK_INTERVAL_MS = 5 * 60 * 1000L
 
     private val supportedExtensions = setOf(
@@ -94,12 +96,12 @@ object DocumentScanner {
     @Volatile private var lastDiagnostic = "No scan has run yet."
 
     private val cacheLock = Any()
-    private val scanLock = Any()
+    // A second screen must wait for the current scan instead of receiving a false empty result.
+    private val scanLock = ReentrantLock()
 
     @Volatile private var cachedFiles: List<IndexedDocument> = emptyList()
     @Volatile private var cachedAt: Long = 0L
     @Volatile private var cacheReady: Boolean = false
-    @Volatile private var scanInProgress: Boolean = false
 
     fun hasAccess(context: Context): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         Environment.isExternalStorageManager()
@@ -150,8 +152,9 @@ object DocumentScanner {
                     )
                 }
                 cachedFiles = restored.sortedByDescending { it.modified }
-                cachedAt = prefs.getLong(PREF_LAST_SCAN, 0L)
-                cacheReady = true
+                cachedAt = if (restored.isNotEmpty()) prefs.getLong(PREF_LAST_SCAN, 0L) else 0L
+                cacheReady = restored.isNotEmpty()
+                lastDiagnostic = prefs.getString(PREF_LAST_DIAGNOSTIC, lastDiagnostic) ?: lastDiagnostic
                 return cachedFiles
             } catch (_: Exception) {
                 // A damaged cache is ignored; a new MediaStore index will be created.
@@ -182,23 +185,29 @@ object DocumentScanner {
 
         loadPersistent(appContext)
 
-        synchronized(scanLock) {
-            if (scanInProgress) return cachedDocuments()
-            scanInProgress = true
-        }
-
+        // Scan runs only on Dispatchers.IO. Locking here makes concurrent screens wait
+        // for the same index operation instead of treating an unfinished scan as "zero files".
+        scanLock.lock()
         try {
             val now = System.currentTimeMillis()
-            if (!forceRefresh && cacheReady && cachedAt > 0L && now - cachedAt < CACHE_TTL_MS) {
+            val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+            if (!forceRefresh && cachedFiles.isNotEmpty() && cacheReady &&
+                cachedAt > 0L && now - cachedAt < CACHE_TTL_MS
+            ) {
+                lastDiagnostic = "Using the saved index: ${cachedFiles.size} documents."
+                prefs.edit().putString(PREF_LAST_DIAGNOSTIC, lastDiagnostic).apply()
                 return cachedFiles
             }
 
-            val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            lastDiagnostic = if (forceRefresh) "Full storage scan started." else "Storage scan started."
+            prefs.edit().putString(PREF_LAST_DIAGNOSTIC, lastDiagnostic).apply()
+
             val lastScanAt = prefs.getLong(PREF_LAST_SCAN, 0L)
             val lastFullScanAt = prefs.getLong(PREF_LAST_FULL_SCAN, 0L)
             // A full reconciliation is only needed on first run, manual refresh,
             // or every five minutes. Normal 20-second checks fetch only changed rows.
-            val fullScan = forceRefresh || lastFullScanAt == 0L ||
+            val fullScan = forceRefresh || cachedFiles.isEmpty() || lastFullScanAt == 0L ||
                 now - lastFullScanAt >= FALLBACK_INTERVAL_MS
             val modifiedAfter = if (fullScan) null else (lastScanAt - 90_000L).coerceAtLeast(0L)
 
@@ -239,7 +248,7 @@ object DocumentScanner {
             } else FolderScanStats()
 
             lastDiagnostic = buildString {
-                append("All-files permission: ").append(if (hasAccess(appContext)) "granted" else "missing")
+                append("Scan completed | All-files permission: ").append(if (hasAccess(appContext)) "granted" else "missing")
                 append(" | volumes queried: ").append(volumeNames.size)
                 append(" | MediaStore documents: ").append(mediaStoreRows)
                 append(" | folder roots: ").append(folderStats.rootsFound)
@@ -250,9 +259,14 @@ object DocumentScanner {
             }
             // Nothing changed on the incremental pass: keep the saved index and
             // only advance the last-check timestamp. Avoid rewriting a large JSON cache.
-            if (!fullScan && mediaStoreWorked && rowsRead == 0 && !shouldFallback) {
+            if (!fullScan && mediaStoreWorked && rowsRead == 0 && !shouldFallback &&
+                cachedFiles.isNotEmpty()
+            ) {
                 cachedAt = now
-                prefs.edit().putLong(PREF_LAST_SCAN, now).apply()
+                prefs.edit()
+                    .putLong(PREF_LAST_SCAN, now)
+                    .putString(PREF_LAST_DIAGNOSTIC, lastDiagnostic)
+                    .apply()
                 return cachedFiles
             }
 
@@ -285,9 +299,16 @@ object DocumentScanner {
             }
 
             cachedAt = 0L
+            appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(PREF_LAST_DIAGNOSTIC, lastDiagnostic).apply()
             return cachedFiles
+        } catch (failure: Exception) {
+            lastDiagnostic = "Scan failed: " + (failure.message ?: failure.javaClass.simpleName)
+            appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(PREF_LAST_DIAGNOSTIC, lastDiagnostic).apply()
+            throw failure
         } finally {
-            synchronized(scanLock) { scanInProgress = false }
+            scanLock.unlock()
         }
     }
 
@@ -314,6 +335,7 @@ object DocumentScanner {
                 .putString(PREF_DOCUMENTS, json.toString())
                 .putLong(PREF_LAST_SCAN, timestamp)
                 .putLong(PREF_LAST_FULL_SCAN, fullScanTimestamp)
+                .putString(PREF_LAST_DIAGNOSTIC, lastDiagnostic)
                 .apply()
         } catch (_: Exception) {
             // A failed cache write must never prevent the library from being used.

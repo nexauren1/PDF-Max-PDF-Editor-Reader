@@ -74,8 +74,8 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.1
-          name: "PDF Max v1.2.1"
+          tag_name: v1.2.2
+          name: "PDF Max v1.2.2"
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           prerelease: false
@@ -84,7 +84,7 @@ jobs:
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/bundle/release/app-release.aab
           body: |
-            PDF Max v1.2.1 stable GitHub release.
+            PDF Max v1.2.2 stable GitHub release.
             Includes a privately signed APK for direct installation and a signed AAB for Google Play submission.
             The release workflow validates the private upload keystore before compiling; it does not fall back to a debug signature.
             Google Play approval, store listing, data-safety declarations and the All files access permission review remain separate steps.
