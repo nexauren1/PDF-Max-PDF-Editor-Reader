@@ -6,7 +6,7 @@ PDF Max is an Android document workspace built with Kotlin, Jetpack Compose, And
 
 The UI follows the supplied PDF Max reference:
 - Deep navy interface, electric-blue borders and violet accents.
-- Color-coded tool cards with a separate tool workspace and matching accent color.
+- Color-coded tool cards with category filters and a separate tool workspace with matching accent color.\n- Every operation follows three screens: file selection and options, visible processing with elapsed time, then result review and explicit save.
 - Dashboard with recent documents, quick actions and an internal document library.
 - Reader with page navigation and page previews.
 - In-app bottom navigation and a full side drawer.
@@ -56,7 +56,7 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 - Adding text is an overlay; it does not rewrite existing PDF text objects.
 - The handwritten signature is a visible handwritten stamp, not a certificate-backed cryptographic digital signature.
 - Filling forms supports existing AcroForm text fields, not every XFA form.
-- PDF re-save, repair and compression depend on the source; a saved file is not guaranteed to be smaller, and a severely corrupted file may not be recoverable.
+- PDF re-save, repair and compression depend on the source; a saved file is not guaranteed to be smaller. The compression result screen compares the original and output sizes and reports the actual change. A severely corrupted file may not be recoverable.
 - PDF translation uses on-device ML Kit language models. The first use downloads the selected source/target models over Wi‑Fi (model downloads can be roughly 30 MB each); scanned PDFs need OCR before translation.
 
 ## Build and release
@@ -65,7 +65,7 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 - Compile SDK 36 and target SDK 36 (Android 16); minimum Android 8.0 (API 26).
 - GitHub Actions builds a Debug APK, a privately signed Release APK and a signed Android App Bundle (AAB).
 - Release jobs validate the private upload keystore, password and alias before building. They fail instead of publishing a debug-signed production package.
-- The stable GitHub release is tagged `v1.2.0`; upload the AAB to Google Play, not the debug APK.
+- The stable GitHub release is tagged `v1.2.3`; upload the AAB to Google Play, not the debug APK.
 
 ## Google Play policy note
 
