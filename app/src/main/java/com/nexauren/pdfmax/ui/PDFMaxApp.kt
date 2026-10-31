@@ -1,6 +1,9 @@
 package com.nexauren.pdfmax.ui
 
 import android.net.Uri
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
 import java.io.File
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -184,7 +187,39 @@ private fun TopBar(screen: Page, english: Boolean, onMenu: () -> Unit, onBack: (
 private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) -> Unit, openPdf: () -> Unit, openFile: (File) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    var storageAccess by remember { mutableStateOf(DocumentScanner.hasAccess(context)) }
     var recentDocuments by remember { mutableStateOf(DocumentScanner.cachedDocuments().take(5)) }
+
+    fun openStorageSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + context.packageName))
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
+        }
+        runCatching { context.startActivity(intent) }.onFailure {
+            runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val granted = DocumentScanner.hasAccess(context)
+                storageAccess = granted
+                if (granted) {
+                    scope.launch {
+                        recentDocuments = withContext(Dispatchers.IO) {
+                            DocumentScanner.scan(context, forceRefresh = true)
+                        }.take(5)
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     LaunchedEffect(Unit) {
         // Load the saved library first, then refresh MediaStore in the background.
         val saved = withContext(Dispatchers.IO) { DocumentScanner.loadPersistent(context) }
@@ -202,6 +237,31 @@ private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp, vertical = 5.dp)) {
         Text(if (en) "Hello, welcome back" else "Olá, bem-vindo!", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
         Text(if (en) "Manage your documents and explore your tools." else "Gira os seus documentos e explore as ferramentas.", color = MaxMuted, fontSize = 12.sp)
+        if (!storageAccess) {
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp))
+                    .background(Color(0xFF17304D))
+                    .border(1.dp, Color(0xFF3B638B), RoundedCornerShape(15.dp))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFF234C70)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.FolderSpecial, null, tint = Color(0xFF8BD6FF))
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(if (en) "Allow document access" else "Ative o acesso aos documentos", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (en) "Required to find PDFs, Word and other files automatically." else "Necessário para encontrar PDFs, Word e outros ficheiros automaticamente.",
+                        color = MaxMuted, fontSize = 9.sp, lineHeight = 13.sp
+                    )
+                }
+                TextButton(onClick = { openStorageSettings() }) {
+                    Text(if (en) "Allow" else "Ativar", color = Color(0xFF8BD6FF), fontWeight = FontWeight.Bold)
+                }
+            }
+        }
         Spacer(Modifier.height(14.dp))
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp))
