@@ -474,6 +474,40 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                     )
                 }
             }
+            if (tool.title == "Comprimir PDF" && selected != null && resultFiles.size == 1) {
+                Spacer(Modifier.height(14.dp))
+                val originalBytes = selected.length()
+                val outputBytes = resultFiles.first().length()
+                if (originalBytes > 0L) {
+                    val difference = originalBytes - outputBytes
+                    val changePercent = kotlin.math.abs(difference).toDouble() * 100.0 / originalBytes.toDouble()
+                    val status = when {
+                        difference > 0L -> if (english) "The file is ${String.format(java.util.Locale.getDefault(), "%.1f", changePercent)}% smaller." else "O ficheiro ficou ${String.format(java.util.Locale.getDefault(), "%.1f", changePercent)}% menor."
+                        difference < 0L -> if (english) "The saved copy is ${String.format(java.util.Locale.getDefault(), "%.1f", changePercent)}% larger. This PDF could not be reduced by a lossless rewrite." else "A cópia ficou ${String.format(java.util.Locale.getDefault(), "%.1f", changePercent)}% maior. Não foi possível reduzir este PDF com uma regravação sem perda."
+                        else -> if (english) "The file size did not change." else "O tamanho do ficheiro não se alterou."
+                    }
+                    ToolPanel(if (english) "Compression check" else "Verificação da compressão", tool.color) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column {
+                                Text(if (english) "Original" else "Original", color = MaxMuted, fontSize = 10.sp)
+                                Text(android.text.format.Formatter.formatShortFileSize(context, originalBytes), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(if (english) "Result" else "Resultado", color = MaxMuted, fontSize = 10.sp)
+                                Text(android.text.format.Formatter.formatShortFileSize(context, outputBytes), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        InfoLine(status, if (difference > 0L) Icons.Default.CheckCircle else Icons.Default.Info)
+                        Text(
+                            if (english) "PDF Max reports the actual file-size change; it does not promise that every PDF can be compressed further."
+                            else "O PDF Max apresenta a alteração real do tamanho; nem todos os PDFs podem ser ainda mais comprimidos.",
+                            color = MaxMuted, fontSize = 9.sp, lineHeight = 13.sp
+                        )
+                    }
+                }
+            }
+
             if (resultFiles.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
                 ToolPanel(
@@ -508,11 +542,16 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            Icon(
-                                if (resultSaved) Icons.Default.CheckCircle else Icons.Default.Schedule,
-                                null, tint = if (resultSaved) Color(0xFF26D39A) else tool.color,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            if (resultSaved) {
+                                IconButton(onClick = { DocumentActions.share(context, produced) }) {
+                                    Icon(Icons.Default.Share, if (english) "Share result" else "Partilhar resultado", tint = tool.color)
+                                }
+                            } else {
+                                Icon(
+                                    Icons.Default.Schedule, null, tint = tool.color,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
