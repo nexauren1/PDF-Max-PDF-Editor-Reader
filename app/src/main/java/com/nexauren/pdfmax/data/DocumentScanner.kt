@@ -59,7 +59,7 @@ data class IndexedDocument(
 object DocumentScanner {
     const val REFRESH_INTERVAL_MS = 20_000L
     private const val CACHE_TTL_MS = REFRESH_INTERVAL_MS
-    private const val QUERY_TIMEOUT_MS = 12_000L
+    private const val QUERY_TIMEOUT_MS = 30_000L
     private const val MAX_MEDIASTORE_RESULTS = 20_000
     private const val MAX_FALLBACK_RESULTS = 4_000
     private const val MAX_FALLBACK_DIRECTORIES = 800
@@ -304,19 +304,16 @@ object DocumentScanner {
             )
         }
 
-        val extensionSelection = if (extensionFilter) {
-            supportedExtensions.joinToString(" OR ") {
-                "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
-            }
-        } else {
-            "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE '%._%'"
-        }
+        // Avoid provider-specific SQL filename filters. Some OEM MediaStore
+        // implementations reject large OR/LIKE expressions, returning no rows.
+        // Query the catalogue and filter supported extensions in Kotlin instead.
         val selection = if (modifiedAfterMillis != null) {
-            "($extensionSelection) AND ${MediaStore.MediaColumns.DATE_MODIFIED} >= ?"
-        } else extensionSelection
-        val args = ArrayList<String>(supportedExtensions.size + 1).apply {
-            if (extensionFilter) addAll(supportedExtensions.map { "%.$it" })
-            if (modifiedAfterMillis != null) add((modifiedAfterMillis / 1000L).toString())
+            "${MediaStore.MediaColumns.DATE_MODIFIED} >= ?"
+        } else null
+        val args = if (modifiedAfterMillis != null) {
+            arrayOf((modifiedAfterMillis / 1000L).toString())
+        } else {
+            emptyArray()
         }
         val cancellation = CancellationSignal()
         val handler = Handler(Looper.getMainLooper())
@@ -346,7 +343,7 @@ object DocumentScanner {
                 var visited = 0
                 while (cursor.moveToNext() &&
                     count < MAX_MEDIASTORE_RESULTS &&
-                    visited < 100_000
+                    visited < 300_000
                 ) {
                     visited++
                     val name = cursor.getString(nameColumn)?.takeIf { it.isNotBlank() } ?: continue
