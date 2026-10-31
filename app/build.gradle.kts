@@ -5,13 +5,13 @@ plugins {
 }
 android {
     namespace = "com.nexauren.pdfmax"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.nexauren.pdfmax"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 4
-        versionName = "1.1.2"
+        targetSdk = 36
+        versionCode = 5
+        versionName = "1.2.0"
     }
     buildFeatures { compose = true }
     val signingStorePath = System.getenv("ANDROID_KEYSTORE_PATH")

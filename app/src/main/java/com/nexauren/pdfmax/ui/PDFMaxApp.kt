@@ -38,10 +38,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
-internal enum class Page { HOME, FILES, TOOLS, READER, OFFICE, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
+internal enum class Page { HOME, FILES, TOOLS, READER, OFFICE, CREATE_PDF, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
 internal data class ToolSpec(val title: String, val subtitle: String, val icon: ImageVector, val color: Color, val page: Page = Page.TOOL)
 
 private val tools = listOf(
+    ToolSpec("Criar PDF", "Laboratório de escrita e layout", Icons.Default.Description, Color(0xFFE65A82), Page.CREATE_PDF),
     ToolSpec("Editar PDF", "Texto, imagens e notas", Icons.Default.Edit, Color(0xFF9257FF), Page.EDITOR),
     ToolSpec("Converter PDF", "Word, Excel e imagem", Icons.Default.SwapHoriz, Color(0xFF13B8A6), Page.CONVERTER),
     ToolSpec("Comprimir PDF", "Reduzir o tamanho", Icons.Default.Compress, Color(0xFF08A9DB)),
@@ -57,7 +58,6 @@ private val tools = listOf(
     ToolSpec("Rodar páginas", "Orientação do PDF", Icons.Default.RotateRight, Color(0xFF19B5A2)),
     ToolSpec("Comparar PDFs", "Ver diferenças", Icons.Default.CompareArrows, Color(0xFFAA63F8)),
     ToolSpec("Traduzir PDF", "Vários idiomas", Icons.Default.Translate, Color(0xFF3989F4)),
-    ToolSpec("Criar PDF", "Documento em branco", Icons.Default.Description, Color(0xFFE65A82)),
     ToolSpec("Preencher formulários", "Campos e formulários", Icons.Default.EditNote, Color(0xFF4A8DFF)),
     ToolSpec("Reparar PDF", "Recuperar ficheiro", Icons.Default.Refresh, Color(0xFF15B9A3)),
     ToolSpec("PDF para imagem", "JPG e PNG", Icons.Default.Photo, Color(0xFFB05BF6)),
@@ -146,10 +146,11 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                     Page.OFFICE -> OfficePreviewScreen(selectedFile, english) { go(Page.FILES) }
                     Page.TOOLS -> ToolsPage(english, { openTool(it) })
                     Page.READER -> ReaderPage(english, pdfName, pdfUri, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
-                    Page.EDITOR -> ToolWorkspaceScreen(tools[0], english)
-                    Page.CONVERTER -> ToolWorkspaceScreen(tools[1], english)
-                    Page.SCANNER -> ToolWorkspaceScreen(tools[7], english)
-                    Page.PROTECT -> ToolWorkspaceScreen(tools[5], english)
+                    Page.CREATE_PDF -> PdfCreatorScreen(english)
+                    Page.EDITOR -> ToolWorkspaceScreen(tools.first { it.title == "Editar PDF" }, english)
+                    Page.CONVERTER -> ToolWorkspaceScreen(tools.first { it.title == "Converter PDF" }, english)
+                    Page.SCANNER -> ToolWorkspaceScreen(tools.first { it.title == "Digitalizar e OCR" }, english)
+                    Page.PROTECT -> ToolWorkspaceScreen(tools.first { it.title == "Proteger PDF" }, english)
                     Page.SETTINGS -> SettingsPage(english, { toggleLanguage() })
                     Page.TOOL -> ToolWorkspaceScreen(currentTool, english)
                 }
@@ -201,7 +202,27 @@ private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp, vertical = 5.dp)) {
         Text(if (en) "Hello, welcome back" else "Olá, bem-vindo!", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
         Text(if (en) "Manage your documents and explore your tools." else "Gira os seus documentos e explore as ferramentas.", color = MaxMuted, fontSize = 12.sp)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF6335C9), Color(0xFF1B66B8), Color(0xFF087E91))))
+                .border(1.dp, Color(0xFF578BFF), RoundedCornerShape(17.dp))
+                .clickable { choose(tools.first { it.title == "Criar PDF" }) }
+                .padding(15.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(47.dp).clip(RoundedCornerShape(13.dp)).background(Color.White.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.EditNote, null, tint = Color.White, modifier = Modifier.size(27.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(if (en) "CREATE A PROFESSIONAL PDF" else "CRIAR UM PDF PROFISSIONAL", color = Color(0xFFDCD4FF), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text(if (en) "Writing & layout lab" else "Laboratório de escrita e layout", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(if (en) "Titles, styles, fonts and tables" else "Títulos, estilos, fontes e tabelas", color = Color(0xFFD5E4FF), fontSize = 10.sp)
+            }
+            Icon(Icons.Default.ArrowForward, null, tint = Color.White)
+        }
+        Spacer(Modifier.height(15.dp))
         SearchBar(if (en) "Search files and folders…" else "Pesquisar arquivos e pastas…") { navigate(Page.FILES) }
         Spacer(Modifier.height(15.dp))
         Box(
@@ -277,11 +298,11 @@ private fun SectionTitle(title: String, action: String, onAction: () -> Unit) {
 }
 
 @Composable
-private fun ToolGrid(list: List<ToolSpec>, onChoose: (ToolSpec) -> Unit) {
+private fun ToolGrid(list: List<ToolSpec>, onChoose: (ToolSpec) -> Unit, english: Boolean = false) {
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
         list.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                row.forEach { ToolTile(it, Modifier.weight(1f)) { onChoose(it) } }
+                row.forEach { ToolTile(it, Modifier.weight(1f), english) { onChoose(it) } }
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
@@ -289,7 +310,7 @@ private fun ToolGrid(list: List<ToolSpec>, onChoose: (ToolSpec) -> Unit) {
 }
 
 @Composable
-private fun ToolTile(tool: ToolSpec, modifier: Modifier = Modifier, click: () -> Unit) {
+private fun ToolTile(tool: ToolSpec, modifier: Modifier = Modifier, english: Boolean = false, click: () -> Unit) {
     Column(
         modifier.height(92.dp).clip(RoundedCornerShape(15.dp))
             .background(Brush.linearGradient(listOf(tool.color.copy(alpha = 0.25f), Color(0xFF0D1B33), Color(0xFF101A31))))
@@ -301,7 +322,7 @@ private fun ToolTile(tool: ToolSpec, modifier: Modifier = Modifier, click: () ->
             Icon(tool.icon, null, tint = Color.White, modifier = Modifier.size(21.dp))
         }
         Spacer(Modifier.height(6.dp))
-        Text(tool.title, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis)
+        Text(localizedToolTitle(tool.title, english), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -367,7 +388,9 @@ private fun FilesPage(en: Boolean, fileName: String, openPdf: () -> Unit, openRe
 private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
     var query by remember { mutableStateOf("") }
     val visibleTools = tools.filter {
-        query.isBlank() || it.title.contains(query, true) || it.subtitle.contains(query, true)
+        query.isBlank() || it.title.contains(query, true) || it.subtitle.contains(query, true) ||
+            localizedToolTitle(it.title, en).contains(query, true) ||
+            localizedToolSubtitle(it.title, en).contains(query, true)
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
         PageTitle(if (en) "All tools" else "Todas as ferramentas", if (en) "A complete workspace for PDF documents" else "Um espaço completo para trabalhar com documentos PDF")
@@ -397,7 +420,7 @@ private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
                 Icons.Default.Search
             )
         } else {
-            ToolGrid(visibleTools, choose)
+            ToolGrid(visibleTools, choose, en)
         }
         Spacer(Modifier.height(18.dp))
         InfoPanel(if (en) "Powerful document workflow" else "Fluxo de documentos avançado", if (en) "Open a tool to configure its options and select a document." else "Abra uma ferramenta para configurar as opções e selecionar um documento.", Icons.Default.AutoAwesome)
@@ -829,3 +852,43 @@ private fun darkFieldColors() = OutlinedTextFieldDefaults.colors(
     cursorColor = MaxCyan, focusedContainerColor = Color(0xFF0D1D35),
     unfocusedContainerColor = Color(0xFF0D1D35)
 )
+
+internal fun localizedToolTitle(title: String, english: Boolean): String {
+    if (!english) return title
+    return when (title) {
+        "Criar PDF" -> "Create PDF"; "Editar PDF" -> "Edit PDF"; "Converter PDF" -> "Convert PDF"
+        "Comprimir PDF" -> "Compress PDF"; "Juntar PDF" -> "Merge PDFs"; "Dividir PDF" -> "Split PDF"
+        "Proteger PDF" -> "Protect PDF"; "Assinar PDF" -> "Sign PDF"; "Digitalizar e OCR" -> "Scan & OCR"
+        "Extrair imagens" -> "Extract images"; "Adicionar texto" -> "Add text"; "Marca de água" -> "Watermark"
+        "Numerar páginas" -> "Page numbers"; "Rodar páginas" -> "Rotate pages"; "Comparar PDFs" -> "Compare PDFs"
+        "Traduzir PDF" -> "Translate PDF"; "Preencher formulários" -> "Fill forms"; "Reparar PDF" -> "Repair PDF"
+        "PDF para imagem" -> "PDF to image"; "Imagem para PDF" -> "Image to PDF"; "Organizar páginas" -> "Organize pages"
+        "Imprimir PDF" -> "Print PDF"; "Partilhar PDF" -> "Share PDF"; "Ver propriedades" -> "File properties"
+        "Remover páginas" -> "Delete pages"; "Extrair texto PDF" -> "Extract PDF text"; "Criar ZIP" -> "Create ZIP"
+        "Detetar duplicados" -> "Find duplicates"; "Extrair páginas" -> "Extract pages"
+        "Adicionar página em branco" -> "Add blank page"; "Editar metadados" -> "Edit metadata"
+        else -> title
+    }
+}
+internal fun localizedToolSubtitle(title: String, english: Boolean): String {
+    if (!english) return if (title == "Criar PDF") "Laboratório de escrita e layout" else tools.firstOrNull { it.title == title }?.subtitle.orEmpty()
+    return when (title) {
+        "Criar PDF" -> "Writing and layout workspace"; "Editar PDF" -> "Text, images and annotations"
+        "Converter PDF" -> "Word, Excel and images"; "Comprimir PDF" -> "Reduce file size"
+        "Juntar PDF" -> "Combine documents"; "Dividir PDF" -> "Split by page range"
+        "Proteger PDF" -> "Password and permissions"; "Assinar PDF" -> "Electronic signature"
+        "Digitalizar e OCR" -> "Scan documents to PDF"; "Extrair imagens" -> "Save embedded images"
+        "Adicionar texto" -> "Insert text"; "Marca de água" -> "Text or image watermark"
+        "Numerar páginas" -> "Headers and footers"; "Rodar páginas" -> "Change page orientation"
+        "Comparar PDFs" -> "Compare document content"; "Traduzir PDF" -> "Translate document text"
+        "Preencher formulários" -> "Fill interactive fields"; "Reparar PDF" -> "Rebuild a readable PDF"
+        "PDF para imagem" -> "Export pages as images"; "Imagem para PDF" -> "Combine JPG and PNG files"
+        "Organizar páginas" -> "Reorder document pages"; "Imprimir PDF" -> "Prepare for printing"
+        "Partilhar PDF" -> "Send your document"; "Ver propriedades" -> "Document information"
+        "Remover páginas" -> "Delete selected pages"; "Extrair texto PDF" -> "Save text as TXT"
+        "Criar ZIP" -> "Archive multiple files"; "Detetar duplicados" -> "Find exact copies"
+        "Extrair páginas" -> "Create a PDF from selected pages"; "Adicionar página em branco" -> "Insert a new page"
+        "Editar metadados" -> "Title, author and keywords"
+        else -> tools.firstOrNull { it.title == title }?.subtitle.orEmpty()
+    }
+}

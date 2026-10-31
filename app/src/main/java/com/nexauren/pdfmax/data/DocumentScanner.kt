@@ -325,7 +325,7 @@ object DocumentScanner {
                 collection,
                 projection,
                 selection,
-                args.toTypedArray(),
+                args,
                 "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
                 cancellation
             )?.use { cursor ->

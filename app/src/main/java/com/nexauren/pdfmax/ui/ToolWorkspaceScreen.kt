@@ -251,8 +251,8 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(tool.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 19.sp)
-                Text(tool.subtitle, color = MaxMuted, fontSize = 10.sp)
+                Text(localizedToolTitle(tool.title, english), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                Text(localizedToolSubtitle(tool.title, english), color = MaxMuted, fontSize = 10.sp)
             }
             Icon(Icons.Default.AutoAwesome, null, tint = tool.color)
         }
@@ -311,7 +311,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                     }
                     if (visible.isEmpty()) Text(if (english) "No compatible files were found. Check the file library." else "Não foram encontrados ficheiros compatíveis. Verifique a biblioteca.", color = MaxMuted, fontSize = 11.sp)
                 }
-                if (eligible.size > 8) TextButton(onClick = { showAll = !showAll }) { Text(if (showAll) "Mostrar menos" else "Mostrar mais ficheiros (" + eligible.size + ")", color = MaxCyan) }
+                if (eligible.size > 8) TextButton(onClick = { showAll = !showAll }) { Text(if (showAll) { if (english) "Show fewer" else "Mostrar menos" } else { if (english) "Show more files (" + eligible.size + ")" else "Mostrar mais ficheiros (" + eligible.size + ")" }, color = MaxCyan) }
             }
 
             ToolPanel(if (english) "2 · Options" else "2 · Opções", tool.color) {
@@ -434,7 +434,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                 if (running) CircularProgressIndicator(Modifier.size(19.dp), color = Color.White, strokeWidth = 2.dp)
                 else Icon(Icons.Default.AutoAwesome, null, tint = Color.White)
                 Spacer(Modifier.width(9.dp))
-                Text(if (running) { if (english) "Processing…" else "A processar…" } else { if (english) "Run " + tool.title else "Executar " + tool.title }, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(if (running) { if (english) "Processing…" else "A processar…" } else { if (english) "Run " + localizedToolTitle(tool.title, true) else "Executar " + tool.title }, color = Color.White, fontWeight = FontWeight.Bold)
             }
 
             outputMessage?.let { message ->

@@ -29,12 +29,12 @@ jobs:
           packages: "platform-tools"
 
       - name: Install Android platform
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.11.1"
 
       - name: Decode private upload keystore
         env:
@@ -51,7 +51,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: gradle assembleDebug assembleRelease
+        run: gradle assembleDebug assembleRelease bundleRelease
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
@@ -60,6 +60,7 @@ jobs:
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -73,8 +74,10 @@ jobs:
           generate_release_notes: true
           prerelease: true
           make_latest: false
-          files: app/build/outputs/apk/release/app-release.apk
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
           body: |
-            PDF Max Android preview build for device testing.
+            PDF Max Android preview build for device testing. Includes a Google Play AAB when signed with the private upload key.
             When the four ANDROID_* signing secrets are configured, the APK uses the private upload key.
             Without them, the APK uses the debug key for testing only and is not a Play Store upload.
