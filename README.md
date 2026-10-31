@@ -39,7 +39,7 @@ On Android 11 and later, full device scanning requires the Android “All files 
 - Batch-create a multi-page PDF from selected images and run batch OCR on several scans into one searchable PDF.
 - Create ZIP archives from selected documents and detect exact duplicate files with SHA-256 (no automatic deletion).
 - Edit PDF title, author, subject and keywords.
-- Create PDFs from text and images.
+- Create structured PDFs in the Writing Lab: title, subtitle, paragraphs, Sans/Serif/Mono fonts, Normal/Bold/Italic styles, adjustable body size, live preview and editable three-column tables.
 - OCR from an image using on-device ML Kit.
 - Capture a document photo inside the app using CameraX, then run OCR.
 - Convert modern DOCX/XLSX/PPTX and text documents to text-based PDF.
@@ -54,18 +54,21 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 - Legacy binary DOC/XLS/PPT files can be indexed, but local preview/conversion is not implemented. Save them as DOCX/XLSX/PPTX first.
 - PDF-to-Office exports preserve selectable text, not the original page layout, typography, complex tables or embedded images.
 - Adding text is an overlay; it does not rewrite existing PDF text objects.
-- The handwritten signature is a visible image stamp, not a certificate-backed cryptographic digital signature.
+- The handwritten signature is a visible handwritten stamp, not a certificate-backed cryptographic digital signature.
 - Filling forms supports existing AcroForm text fields, not every XFA form.
-- PDF resave/repair/compression depends on the source PDF; a resaved file is not guaranteed to be smaller or recoverable if severely corrupted.
+- PDF re-save, repair and compression depend on the source; a saved file is not guaranteed to be smaller, and a severely corrupted file may not be recoverable.
 - PDF translation uses on-device ML Kit language models. The first use downloads the selected source/target models over Wi‑Fi (model downloads can be roughly 30 MB each); scanned PDFs need OCR before translation.
 
-## Build in Android Studio
+## Build and release
 
-1. Open the repository as a Gradle project.
-2. Use JDK 17.
-3. Install Android SDK platform 35 and build tools 35.0.0.
-4. Run the app configuration on Android 8.0+.
+- Android Gradle Plugin 8.10.1, Gradle 8.11.1 and JDK 17.
+- Compile SDK 36 and target SDK 36 (Android 16); minimum Android 8.0 (API 26).
+- GitHub Actions builds a Debug APK, a privately signed Release APK and a signed Android App Bundle (AAB).
+- Release jobs validate the private upload keystore, password and alias before building. They fail instead of publishing a debug-signed production package.
+- The stable GitHub release is tagged `v1.2.0`; upload the AAB to Google Play, not the debug APK.
 
-GitHub Actions builds Debug and Release APKs on pushes to main and publishes a preview release when the build succeeds.
+## Google Play policy note
 
-Preview releases are signed with the Android debug key for device testing only. Configure a private upload keystore before publishing a production APK/AAB to Google Play.
+PDF Max requests Android All files access because its core document library discovers and manages compatible documents across shared device storage. Google Play treats `MANAGE_EXTERNAL_STORAGE` as a restricted, high-risk permission: submit the Permissions Declaration Form, explain why a document library's full-device indexing cannot be replaced by a user-selected Storage Access Framework flow, and wait for approval. Approval is not guaranteed. See [Google Play's All files access policy](https://support.google.com/googleplay/android-developer/answer/10467955).
+
+Before Play submission, complete the [Google Play launch checklist](GOOGLE_PLAY_LAUNCH_CHECKLIST.md) and publish the [privacy policy](PRIVACY_POLICY.md) at a stable public URL.

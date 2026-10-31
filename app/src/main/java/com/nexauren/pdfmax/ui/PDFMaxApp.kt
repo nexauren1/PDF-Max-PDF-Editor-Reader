@@ -46,13 +46,13 @@ internal data class ToolSpec(val title: String, val subtitle: String, val icon: 
 
 private val tools = listOf(
     ToolSpec("Criar PDF", "Laboratório de escrita e layout", Icons.Default.Description, Color(0xFFE65A82), Page.CREATE_PDF),
-    ToolSpec("Editar PDF", "Texto, imagens e notas", Icons.Default.Edit, Color(0xFF9257FF), Page.EDITOR),
+    ToolSpec("Editar PDF", "Sobreposição de texto em páginas PDF", Icons.Default.Edit, Color(0xFF9257FF), Page.EDITOR),
     ToolSpec("Converter PDF", "Word, Excel e imagem", Icons.Default.SwapHoriz, Color(0xFF13B8A6), Page.CONVERTER),
-    ToolSpec("Comprimir PDF", "Reduzir o tamanho", Icons.Default.Compress, Color(0xFF08A9DB)),
+    ToolSpec("Comprimir PDF", "Regravar e otimizar; tamanho pode variar", Icons.Default.Compress, Color(0xFF08A9DB)),
     ToolSpec("Juntar PDF", "Combinar documentos", Icons.Default.MergeType, Color(0xFFFF8A35)),
     ToolSpec("Dividir PDF", "Separar por páginas", Icons.Default.CallSplit, Color(0xFF4285F4)),
     ToolSpec("Proteger PDF", "Senha e permissões", Icons.Default.Security, Color(0xFFE84B70), Page.PROTECT),
-    ToolSpec("Assinar PDF", "Assinatura eletrónica", Icons.Default.Draw, Color(0xFF9A59FF)),
+    ToolSpec("Assinar PDF", "Assinatura manuscrita visual", Icons.Default.Draw, Color(0xFF9A59FF)),
     ToolSpec("Digitalizar e OCR", "Documento para PDF", Icons.Default.QrCodeScanner, Color(0xFF13B7D0), Page.SCANNER),
     ToolSpec("Extrair imagens", "Guardar imagens", Icons.Default.Image, Color(0xFF18A5E8)),
     ToolSpec("Adicionar texto", "Inserir texto", Icons.Default.TextFields, Color(0xFF17B7D3), Page.EDITOR),
@@ -62,7 +62,7 @@ private val tools = listOf(
     ToolSpec("Comparar PDFs", "Ver diferenças", Icons.Default.CompareArrows, Color(0xFFAA63F8)),
     ToolSpec("Traduzir PDF", "Vários idiomas", Icons.Default.Translate, Color(0xFF3989F4)),
     ToolSpec("Preencher formulários", "Campos e formulários", Icons.Default.EditNote, Color(0xFF4A8DFF)),
-    ToolSpec("Reparar PDF", "Recuperar ficheiro", Icons.Default.Refresh, Color(0xFF15B9A3)),
+    ToolSpec("Reparar PDF", "Tentar recuperar PDFs legíveis", Icons.Default.Refresh, Color(0xFF15B9A3)),
     ToolSpec("PDF para imagem", "JPG e PNG", Icons.Default.Photo, Color(0xFFB05BF6)),
     ToolSpec("Imagem para PDF", "JPG, PNG e mais", Icons.Default.Collections, Color(0xFF12A9D8)),
     ToolSpec("Organizar páginas", "Reordenar e eliminar", Icons.Default.GridView, Color(0xFF168DFF)),
@@ -937,15 +937,15 @@ internal fun localizedToolTitle(title: String, english: Boolean): String {
 internal fun localizedToolSubtitle(title: String, english: Boolean): String {
     if (!english) return if (title == "Criar PDF") "Laboratório de escrita e layout" else tools.firstOrNull { it.title == title }?.subtitle.orEmpty()
     return when (title) {
-        "Criar PDF" -> "Writing and layout workspace"; "Editar PDF" -> "Text, images and annotations"
-        "Converter PDF" -> "Word, Excel and images"; "Comprimir PDF" -> "Reduce file size"
+        "Criar PDF" -> "Writing and layout workspace"; "Editar PDF" -> "Add text overlays to PDF pages"
+        "Converter PDF" -> "Word, Excel and images"; "Comprimir PDF" -> "Rewrite PDF structure; size may vary"
         "Juntar PDF" -> "Combine documents"; "Dividir PDF" -> "Split by page range"
-        "Proteger PDF" -> "Password and permissions"; "Assinar PDF" -> "Electronic signature"
+        "Proteger PDF" -> "Password and permissions"; "Assinar PDF" -> "Handwritten visual signature"
         "Digitalizar e OCR" -> "Scan documents to PDF"; "Extrair imagens" -> "Save embedded images"
         "Adicionar texto" -> "Insert text"; "Marca de água" -> "Text or image watermark"
         "Numerar páginas" -> "Headers and footers"; "Rodar páginas" -> "Change page orientation"
         "Comparar PDFs" -> "Compare document content"; "Traduzir PDF" -> "Translate document text"
-        "Preencher formulários" -> "Fill interactive fields"; "Reparar PDF" -> "Rebuild a readable PDF"
+        "Preencher formulários" -> "Fill interactive fields"; "Reparar PDF" -> "Attempt to recover readable PDFs"
         "PDF para imagem" -> "Export pages as images"; "Imagem para PDF" -> "Combine JPG and PNG files"
         "Organizar páginas" -> "Reorder document pages"; "Imprimir PDF" -> "Prepare for printing"
         "Partilhar PDF" -> "Send your document"; "Ver propriedades" -> "Document information"
