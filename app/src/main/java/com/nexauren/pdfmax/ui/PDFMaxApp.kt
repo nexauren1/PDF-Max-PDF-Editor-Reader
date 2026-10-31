@@ -256,7 +256,7 @@ private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) 
         }
         Spacer(Modifier.height(18.dp))
         SectionTitle(if (en) "Quick tools" else "Ferramentas rápidas", if (en) "See all" else "Ver tudo") { navigate(Page.TOOLS) }
-        ToolGrid(listOf(tools[0], tools[1], tools[2], tools[3], tools[5], tools[7]), choose)
+        ToolGrid(listOf(tools[0], tools[1], tools[2], tools[3], tools[5], tools[7]), choose, en)
         Spacer(Modifier.height(18.dp))
         SectionTitle(if (en) "Recent files" else "Arquivos recentes", if (en) "View all" else "Ver todos") { navigate(Page.FILES) }
         if (recentDocuments.isEmpty()) {
@@ -479,7 +479,7 @@ private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> 
             ReaderAction(Icons.Default.Share, if (en) "Share" else "Partilhar")
         }
         Spacer(Modifier.height(12.dp))
-        SectionTitle(if (en) "Pages" else "Páginas", if (en) "Organize" else "Organizar") { choose(tools[20]) }
+        SectionTitle(if (en) "Pages" else "Páginas", if (en) "Organize" else "Organizar") { choose(tools.first { it.title == "Organizar páginas" }) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (1..pageCount.coerceAtMost(5)).forEach { n ->
                 Column(
@@ -529,7 +529,11 @@ private fun EditorPage(en: Boolean, uri: Uri?, openPdf: () -> Unit, choose: (Too
         Spacer(Modifier.height(10.dp))
         Text(if (en) "EDITING TOOLS" else "FERRAMENTAS DE EDIÇÃO", color = MaxMuted, fontWeight = FontWeight.Bold, fontSize = 10.sp)
         Spacer(Modifier.height(8.dp))
-        ToolGrid(listOf(tools[9], tools[0], tools[6], tools[10], tools[16], tools[12]), choose)
+        ToolGrid(
+            listOf("Adicionar texto", "Editar PDF", "Assinar PDF", "Marca de água", "Preencher formulários", "Rodar páginas")
+                .map { title -> tools.first { it.title == title } },
+            choose, en
+        )
         Spacer(Modifier.height(12.dp))
         InfoPanel(if (en) "Precise PDF editing" else "Edição precisa de PDF", if (en) "Choose a tool, select an element and apply your changes." else "Escolha uma ferramenta, selecione um elemento e aplique as alterações.", Icons.Default.Tune)
         Spacer(Modifier.height(12.dp))
