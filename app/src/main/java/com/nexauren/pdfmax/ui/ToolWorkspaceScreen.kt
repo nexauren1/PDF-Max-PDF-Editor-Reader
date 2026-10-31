@@ -49,6 +49,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private enum class ToolFlowStage { SELECT, PROCESSING, RESULT }
+
 @Composable
 internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     val context = LocalContext.current
@@ -83,6 +85,24 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     var exportFormat by remember { mutableStateOf("Word") }
     var showAll by remember { mutableStateOf(false) }
     var awaitingPermissionReturn by remember { mutableStateOf(false) }
+
+    // A tool is a three-stage workflow: selection, visible processing, then result/save.
+    var flowStage by remember(tool.title) { mutableStateOf(ToolFlowStage.SELECT) }
+    var progressElapsedSeconds by remember(tool.title) { mutableIntStateOf(0) }
+    var progressLabel by remember(tool.title) { mutableStateOf("") }
+    var resultFailed by remember(tool.title) { mutableStateOf(false) }
+    var resultSaved by remember(tool.title) { mutableStateOf(false) }
+    var saving by remember(tool.title) { mutableStateOf(false) }
+
+    LaunchedEffect(flowStage) {
+        if (flowStage == ToolFlowStage.PROCESSING) {
+            progressElapsedSeconds = 0
+            while (flowStage == ToolFlowStage.PROCESSING) {
+                delay(1_000)
+                if (flowStage == ToolFlowStage.PROCESSING) progressElapsedSeconds += 1
+            }
+        }
+    }
 
     fun refresh(forceRefresh: Boolean = false) {
         access = DocumentScanner.hasAccess(context)
@@ -168,9 +188,15 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         }
         scope.launch {
             running = true
+            flowStage = ToolFlowStage.PROCESSING
+            progressElapsedSeconds = 0
+            progressLabel = if (english) "Preparing selected files…" else "A preparar os ficheiros selecionados…"
+            resultFailed = false
+            resultSaved = false
             outputMessage = null
             resultFiles = emptyList()
             val result = runCatching {
+                progressLabel = if (english) "Running " + localizedToolTitle(tool.title, true) + "…" else "A executar " + tool.title + "…"
                 withContext(Dispatchers.IO) {
                     when (tool.title) {
                         "Juntar PDF" -> listOf(PdfOperations.merge(context, documents.filter { it.file.absolutePath in selectedPaths }.map { it.file }))
@@ -232,17 +258,315 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                     }
                 }
             }
-            result.onSuccess { produced ->
-                resultFiles = produced
-                if (produced.isNotEmpty()) outputMessage = if (english) "Completed. Saved in Documents/PDF Max." else "Concluído. Guardado em Documentos/PDF Max."
-                if (produced.isNotEmpty()) DocumentScanner.invalidate()
-                refresh(forceRefresh = produced.isNotEmpty())
-            }.onFailure {
-                outputMessage = (if (english) "Could not complete: " else "Não foi possível concluir: ") + (it.message ?: "erro desconhecido")
+            progressLabel = if (english) "Preparing the result…" else "A preparar o resultado…"
+            if (result.isSuccess) {
+                val produced = result.getOrThrow()
+                if (produced.isNotEmpty()) {
+                    // Keep generated files private until the user confirms Save on the result screen.
+                    val staged = runCatching {
+                        withContext(Dispatchers.IO) {
+                            val stagingDirectory = File(context.cacheDir, "pdfmax_pending_" + System.currentTimeMillis())
+                            check(stagingDirectory.mkdirs() || stagingDirectory.isDirectory) {
+                                "Não foi possível preparar a pasta temporária."
+                            }
+                            val copies = produced.map { output ->
+                                output.copyTo(File(stagingDirectory, output.name), overwrite = true)
+                            }
+                            produced.forEach { it.delete() }
+                            copies
+                        }
+                    }
+                    if (staged.isSuccess) {
+                        resultFiles = staged.getOrThrow()
+                        resultSaved = false
+                        outputMessage = if (english) {
+                            "Your result is ready. Review the files below and save them to your device."
+                        } else {
+                            "O resultado está pronto. Reveja os ficheiros abaixo e guarde-os no dispositivo."
+                        }
+                    } else {
+                        // If temporary staging fails, preserve the operation's original saved output.
+                        resultFiles = produced
+                        resultSaved = true
+                        outputMessage = if (english) {
+                            "Completed. The output remains in its original location: " + (produced.firstOrNull()?.parent.orEmpty())
+                        } else {
+                            "Concluído. O resultado permanece na localização original: " + (produced.firstOrNull()?.parent.orEmpty())
+                        }
+                    }
+                }
+                resultFailed = false
+            } else {
+                val failure = result.exceptionOrNull()
+                outputMessage = (if (english) "Could not complete: " else "Não foi possível concluir: ") +
+                    (failure?.message ?: if (english) "Unknown error" else "erro desconhecido")
+                resultFailed = true
             }
+            flowStage = ToolFlowStage.RESULT
             running = false
         }
     }
+
+    fun saveResults() {
+        if (saving || resultSaved || resultFiles.isEmpty()) return
+        scope.launch {
+            saving = true
+            val saveAttempt = runCatching {
+                withContext(Dispatchers.IO) {
+                    val outputDirectory = PdfOperations.outputDirectory()
+                    check(outputDirectory.exists() || outputDirectory.mkdirs()) {
+                        "Não foi possível criar Documentos/PDF Max."
+                    }
+                    resultFiles.map { pending ->
+                        var destination = File(outputDirectory, pending.name)
+                        if (destination.exists()) {
+                            val base = pending.nameWithoutExtension
+                            val extension = pending.extension
+                            var suffix = 2
+                            do {
+                                val candidateName = if (extension.isBlank()) "$base ($suffix)" else "$base ($suffix).$extension"
+                                destination = File(outputDirectory, candidateName)
+                                suffix++
+                            } while (destination.exists())
+                        }
+                        pending.copyTo(destination, overwrite = false)
+                    }
+                }
+            }
+            if (saveAttempt.isSuccess) {
+                val savedFiles = saveAttempt.getOrThrow()
+                resultFiles = savedFiles
+                resultSaved = true
+                outputMessage = if (english) {
+                    "Saved successfully in Documents/PDF Max."
+                } else {
+                    "Guardado com sucesso em Documentos/PDF Max."
+                }
+                withContext(Dispatchers.IO) {
+                    resultFiles.mapNotNull { it.parentFile }
+                        .distinctBy { it.absolutePath }
+                        .filter { it.name.startsWith("pdfmax_pending_") }
+                        .forEach { it.deleteRecursively() }
+                }
+                DocumentScanner.invalidate()
+                refresh(forceRefresh = true)
+            } else {
+                outputMessage = (if (english) "Could not save: " else "Não foi possível guardar: ") +
+                    (saveAttempt.exceptionOrNull()?.message ?: "erro desconhecido")
+            }
+            saving = false
+        }
+    }
+
+    if (flowStage == ToolFlowStage.PROCESSING) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                Modifier.size(82.dp).clip(RoundedCornerShape(24.dp))
+                    .background(tool.color.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(tool.icon, null, tint = tool.color, modifier = Modifier.size(42.dp))
+            }
+            Spacer(Modifier.height(24.dp))
+            Text(
+                if (english) "STEP 2 OF 3 · PROCESSING" else "ETAPA 2 DE 3 · A PROCESSAR",
+                color = tool.color, fontSize = 11.sp, fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                if (english) localizedToolTitle(tool.title, true) else tool.title,
+                color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                progressLabel,
+                color = MaxMuted, fontSize = 12.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(Modifier.height(24.dp))
+            CircularProgressIndicator(
+                modifier = Modifier.size(44.dp),
+                color = tool.color,
+                strokeWidth = 4.dp
+            )
+            Spacer(Modifier.height(20.dp))
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = tool.color,
+                trackColor = Color(0xFF203653)
+            )
+            Spacer(Modifier.height(18.dp))
+            val elapsedMinutes = progressElapsedSeconds / 60
+            val elapsedSeconds = progressElapsedSeconds % 60
+            val elapsed = String.format(java.util.Locale.getDefault(), "%02d:%02d", elapsedMinutes, elapsedSeconds)
+            Text(
+                (if (english) "Elapsed time: " else "Tempo decorrido: ") + elapsed,
+                color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(11.dp))
+            val fileCount = when {
+                tool.title == "Detetar duplicados" -> documents.size
+                needsMultiple -> selectedPaths.size
+                selected != null -> 1
+                else -> 0
+            }
+            Text(
+                if (english) "Working with $fileCount file(s). Large or scanned PDFs may take longer. Keep PDF Max open."
+                else "A processar $fileCount ficheiro(s). PDFs grandes ou digitalizados podem demorar mais. Mantenha o PDF Max aberto.",
+                color = MaxMuted, fontSize = 11.sp, lineHeight = 16.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(Modifier.height(18.dp))
+            ToolPanel(if (english) "What is happening now" else "O que está a acontecer", tool.color) {
+                InfoLine(
+                    if (english) "PDF Max is processing your selection in the background. This indicator stays visible until the operation finishes."
+                    else "O PDF Max está a processar a sua seleção em segundo plano. Este indicador permanece visível até a operação terminar.",
+                    Icons.Default.Sync
+                )
+            }
+        }
+    } else if (flowStage == ToolFlowStage.RESULT) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(56.dp).clip(RoundedCornerShape(17.dp))
+                        .background(if (resultFailed) Color(0xFFB83D55) else Color(0xFF159B79)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        if (resultFailed) Icons.Default.ErrorOutline else Icons.Default.CheckCircle,
+                        null, tint = Color.White, modifier = Modifier.size(31.dp)
+                    )
+                }
+                Spacer(Modifier.width(13.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (english) "STEP 3 OF 3 · RESULT" else "ETAPA 3 DE 3 · RESULTADO",
+                        color = tool.color, fontSize = 10.sp, fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        when {
+                            resultFailed -> if (english) "Operation failed" else "Não foi possível concluir"
+                            resultFiles.isNotEmpty() && !resultSaved -> if (english) "Ready to save" else "Pronto para guardar"
+                            resultFiles.isNotEmpty() && resultSaved -> if (english) "Files saved" else "Ficheiros guardados"
+                            else -> if (english) "Operation completed" else "Operação concluída"
+                        },
+                        color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            outputMessage?.let { message ->
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp))
+                        .background(Color(0xFF112541))
+                        .padding(14.dp)
+                ) {
+                    Text(
+                        message, color = Color.White, fontSize = 11.sp, lineHeight = 17.sp
+                    )
+                }
+            }
+            if (resultFiles.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                ToolPanel(
+                    if (resultSaved) {
+                        if (english) "Saved output" else "Resultado guardado"
+                    } else {
+                        if (english) "Review your result" else "Rever o resultado"
+                    },
+                    tool.color
+                ) {
+                    resultFiles.forEach { produced ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                if (produced.extension.equals("pdf", true)) Icons.Default.PictureAsPdf else Icons.Default.InsertDriveFile,
+                                null, tint = tool.color, modifier = Modifier.size(25.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    produced.name, color = Color.White,
+                                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    if (resultSaved) produced.absolutePath
+                                    else (if (english) "Temporary result · " else "Resultado temporário · ") +
+                                        String.format(java.util.Locale.getDefault(), "%.1f KB", produced.length() / 1024f),
+                                    color = MaxMuted, fontSize = 9.sp, maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Icon(
+                                if (resultSaved) Icons.Default.CheckCircle else Icons.Default.Schedule,
+                                null, tint = if (resultSaved) Color(0xFF26D39A) else tool.color,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            if (resultFiles.isNotEmpty() && !resultSaved && !resultFailed) {
+                Button(
+                    onClick = { saveResults() },
+                    enabled = !saving,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = tool.color),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    if (saving) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                    else Icon(Icons.Default.Save, null, tint = Color.White)
+                    Spacer(Modifier.width(9.dp))
+                    Text(
+                        if (saving) {
+                            if (english) "Saving…" else "A guardar…"
+                        } else {
+                            if (english) "Save to Documents / PDF Max" else "Guardar em Documentos / PDF Max"
+                        },
+                        color = Color.White, fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = {
+                    flowStage = ToolFlowStage.SELECT
+                    outputMessage = null
+                    resultFiles = emptyList()
+                    resultFailed = false
+                    resultSaved = false
+                    selectedPaths = emptySet()
+                    selected = null
+                },
+                modifier = Modifier.fillMaxWidth().height(49.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF31547A)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                shape = RoundedCornerShape(13.dp)
+            ) {
+                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (resultFailed) {
+                        if (english) "Try again" else "Tentar novamente"
+                    } else {
+                        if (english) "New operation" else "Nova operação"
+                    },
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    } else {
 
     Column(Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -434,7 +758,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                 if (running) CircularProgressIndicator(Modifier.size(19.dp), color = Color.White, strokeWidth = 2.dp)
                 else Icon(Icons.Default.AutoAwesome, null, tint = Color.White)
                 Spacer(Modifier.width(9.dp))
-                Text(if (running) { if (english) "Processing…" else "A processar…" } else { if (english) "Run " + localizedToolTitle(tool.title, true) else "Executar " + tool.title }, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(if (running) { if (english) "Processing…" else "A processar…" } else { if (english) "Start " + localizedToolTitle(tool.title, true) else "Iniciar " + tool.title }, color = Color.White, fontWeight = FontWeight.Bold)
             }
 
             outputMessage?.let { message ->
@@ -457,6 +781,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
             Spacer(Modifier.height(15.dp))
             Text(if (english) "Output folder: Documents / PDF Max" else "Pasta de saída: Documentos / PDF Max", color = MaxMuted, fontSize = 9.sp)
         }
+    }
     }
 }
 
