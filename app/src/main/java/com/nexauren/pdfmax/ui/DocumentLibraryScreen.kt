@@ -208,6 +208,7 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
             EmptyFilesCard(
                 english = english,
                 searched = query.isNotBlank() || scanned,
+                diagnostic = DocumentScanner.lastScanDiagnostic(english),
                 onGrantAccess = { requestAccess() },
                 onRescan = { refresh(forceRefresh = true) }
             )
@@ -301,6 +302,7 @@ private fun ScanErrorCard(english: Boolean, message: String, retry: () -> Unit) 
 private fun EmptyFilesCard(
     english: Boolean,
     searched: Boolean,
+    diagnostic: String,
     onGrantAccess: () -> Unit,
     onRescan: () -> Unit
 ) {
@@ -321,23 +323,25 @@ private fun EmptyFilesCard(
         )
         Spacer(Modifier.height(5.dp))
         Text(
-            if (english) "Check that PDF Max has “All files access” in Android Settings. Then run a full scan." else "Confirme nas Definições do Android se o PDF Max tem “Acesso a todos os ficheiros”. Depois faça uma análise completa.",
+            if (english) "All-files access is active, but the scan returned no compatible documents. Run a deeper scan of the mounted storage volumes." else "O acesso a todos os ficheiros está ativo, mas a análise não devolveu documentos compatíveis. Vamos pesquisar mais profundamente os volumes de armazenamento montados.",
             color = MaxMuted,
             fontSize = 11.sp,
             lineHeight = 16.sp
         )
+        Spacer(Modifier.height(9.dp))
+        Text(diagnostic, color = Color(0xFF8FA6C4), fontSize = 9.sp, lineHeight = 13.sp)
         Spacer(Modifier.height(13.dp))
         Button(
-            onClick = onGrantAccess,
+            onClick = onRescan,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF087FF1)),
             shape = RoundedCornerShape(11.dp)
         ) {
-            Icon(Icons.Default.Security, null)
+            Icon(Icons.Default.Refresh, null)
             Spacer(Modifier.width(7.dp))
-            Text(if (english) "Check file permission" else "Verificar permissão de ficheiros")
+            Text(if (english) "Run full storage scan" else "Analisar todo o armazenamento")
         }
-        TextButton(onClick = onRescan) {
-            Text(if (english) "Scan storage again" else "Analisar armazenamento novamente", color = MaxCyan)
+        TextButton(onClick = onGrantAccess) {
+            Text(if (english) "Review Android file access" else "Rever acesso a ficheiros no Android", color = MaxCyan)
         }
     }
 }

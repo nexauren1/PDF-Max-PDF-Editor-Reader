@@ -5,6 +5,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.Environment
+import android.os.SystemClock
+import android.os.storage.StorageManager
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -61,9 +63,10 @@ object DocumentScanner {
     private const val CACHE_TTL_MS = REFRESH_INTERVAL_MS
     private const val QUERY_TIMEOUT_MS = 30_000L
     private const val MAX_MEDIASTORE_RESULTS = 20_000
-    private const val MAX_FALLBACK_RESULTS = 4_000
-    private const val MAX_FALLBACK_DIRECTORIES = 800
-    private const val MAX_FALLBACK_DEPTH = 5
+    private const val MAX_FALLBACK_RESULTS = 20_000
+    private const val MAX_FALLBACK_DIRECTORIES = 20_000
+    private const val MAX_FALLBACK_DEPTH = 12
+    private const val MAX_FALLBACK_SCAN_MS = 35_000L
     private const val PREFS = "pdfmax_document_index_v2"
     private const val PREF_DOCUMENTS = "documents_json"
     private const val PREF_LAST_SCAN = "last_scan_epoch"
@@ -79,6 +82,16 @@ object DocumentScanner {
         "txt", "md", "log",
         "zip", "rar", "7z", "tar", "gz"
     )
+
+    private data class FolderScanStats(
+        val rootsFound: Int = 0,
+        val directoriesVisited: Int = 0,
+        val inaccessibleDirectories: Int = 0,
+        val documentsAdded: Int = 0,
+        val timedOut: Boolean = false
+    )
+
+    @Volatile private var lastDiagnostic = "No scan has run yet."
 
     private val cacheLock = Any()
     private val scanLock = Any()
@@ -99,6 +112,9 @@ object DocumentScanner {
 
     /** Fast in-memory access for screens that are already alive. */
     fun cachedDocuments(): List<IndexedDocument> = if (cacheReady) cachedFiles else emptyList()
+
+    /** Explains what the last discovery pass actually checked, without exposing file names. */
+    fun lastScanDiagnostic(english: Boolean): String = lastDiagnostic
 
     /**
      * Restores the last saved index. Call this on Dispatchers.IO before starting
@@ -191,23 +207,47 @@ object DocumentScanner {
                 cachedFiles.forEach { found[it.file.absolutePath] = it }
             }
 
-            var rowsRead = queryMediaStore(appContext, found, modifiedAfter, extensionFilter = true)
-            if (rowsRead <= 0) {
-                // Retry with a broad filename query if the OEM provider rejects or
-                // ignores the extension-specific selection.
-                val broadRows = queryMediaStore(appContext, found, modifiedAfter, extensionFilter = false)
-                if (broadRows >= 0) rowsRead = broadRows
+            val volumeNames = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                runCatching { MediaStore.getExternalVolumeNames(appContext).toList() }
+                    .getOrDefault(emptyList())
+                    .toMutableSet()
+                    .apply { add(MediaStore.VOLUME_EXTERNAL_PRIMARY) }
+            } else {
+                setOf("external")
             }
-            val mediaStoreWorked = rowsRead >= 0
+
+            var mediaStoreRows = 0
+            var successfulVolumeQueries = 0
+            volumeNames.forEach { volumeName ->
+                val rows = queryMediaStore(appContext, found, modifiedAfter, volumeName)
+                if (rows >= 0) {
+                    successfulVolumeQueries++
+                    mediaStoreRows += rows
+                }
+            }
+            val mediaStoreWorked = successfulVolumeQueries > 0
+            val rowsRead = if (mediaStoreWorked) mediaStoreRows else -1
+
             val lastFallback = prefs.getLong(PREF_LAST_FALLBACK, 0L)
             val shouldFallback = found.isEmpty() ||
                 lastFallback == 0L || now - lastFallback >= FALLBACK_INTERVAL_MS
 
-            if (shouldFallback) {
-                scanKnownFolders(appContext, found)
-                prefs.edit().putLong(PREF_LAST_FALLBACK, now).apply()
-            }
+            val folderStats = if (shouldFallback) {
+                scanKnownFolders(appContext, found).also {
+                    prefs.edit().putLong(PREF_LAST_FALLBACK, now).apply()
+                }
+            } else FolderScanStats()
 
+            lastDiagnostic = buildString {
+                append("All-files permission: ").append(if (hasAccess(appContext)) "granted" else "missing")
+                append(" | volumes queried: ").append(volumeNames.size)
+                append(" | MediaStore documents: ").append(mediaStoreRows)
+                append(" | folder roots: ").append(folderStats.rootsFound)
+                append(" | folders visited: ").append(folderStats.directoriesVisited)
+                append(" | inaccessible folders: ").append(folderStats.inaccessibleDirectories)
+                append(" | extra documents: ").append(folderStats.documentsAdded)
+                if (folderStats.timedOut) append(" | folder scan reached its time limit")
+            }
             // Nothing changed on the incremental pass: keep the saved index and
             // only advance the last-check timestamp. Avoid rewriting a large JSON cache.
             if (!fullScan && mediaStoreWorked && rowsRead == 0 && !shouldFallback) {
@@ -236,7 +276,7 @@ object DocumentScanner {
 
             // If MediaStore is temporarily unavailable, preserve the old library.
             // A folder fallback may still add new files, but the next check retries MediaStore.
-            if (result.isNotEmpty() && result.size != cachedFiles.size) {
+            if (result.isNotEmpty() && result != cachedFiles) {
                 cachedFiles = result
                 cacheReady = true
                 cachedAt = now
@@ -285,9 +325,9 @@ object DocumentScanner {
         context: Context,
         destination: MutableMap<String, IndexedDocument>,
         modifiedAfterMillis: Long?,
-        extensionFilter: Boolean
+        volumeName: String
     ): Int {
-        val collection = MediaStore.Files.getContentUri("external")
+        val collection = MediaStore.Files.getContentUri(volumeName)
         val projection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             arrayOf(
                 MediaStore.MediaColumns.DISPLAY_NAME,
@@ -303,17 +343,11 @@ object DocumentScanner {
                 MediaStore.MediaColumns.DATE_MODIFIED
             )
         }
-
-        // Avoid provider-specific SQL filename filters. Some OEM MediaStore
-        // implementations reject large OR/LIKE expressions, returning no rows.
-        // Query the catalogue and filter supported extensions in Kotlin instead.
-        val selection = if (modifiedAfterMillis != null) {
+        val selection = modifiedAfterMillis?.let {
             "${MediaStore.MediaColumns.DATE_MODIFIED} >= ?"
-        } else null
-        val args = if (modifiedAfterMillis != null) {
-            arrayOf((modifiedAfterMillis / 1000L).toString())
-        } else {
-            emptyArray()
+        }
+        val selectionArgs = modifiedAfterMillis?.let {
+            arrayOf((it / 1000L).toString())
         }
         val cancellation = CancellationSignal()
         val handler = Handler(Looper.getMainLooper())
@@ -325,7 +359,7 @@ object DocumentScanner {
                 collection,
                 projection,
                 selection,
-                args,
+                selectionArgs,
                 "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
                 cancellation
             )?.use { cursor ->
@@ -336,15 +370,12 @@ object DocumentScanner {
                 val relativePathColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
                 } else -1
-
                 if (nameColumn < 0) return@use -1
 
+                val volumeRoot = resolveVolumeRoot(context, volumeName)
                 var count = 0
                 var visited = 0
-                while (cursor.moveToNext() &&
-                    count < MAX_MEDIASTORE_RESULTS &&
-                    visited < 300_000
-                ) {
+                while (cursor.moveToNext() && count < MAX_MEDIASTORE_RESULTS && visited < 300_000) {
                     visited++
                     val name = cursor.getString(nameColumn)?.takeIf { it.isNotBlank() } ?: continue
                     val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
@@ -354,18 +385,14 @@ object DocumentScanner {
                     val relativePath = if (relativePathColumn >= 0) cursor.getString(relativePathColumn) else null
                     val path = when {
                         !dataPath.isNullOrBlank() -> dataPath
-                        !relativePath.isNullOrBlank() -> File(
-                            Environment.getExternalStorageDirectory(),
-                            relativePath + name
-                        ).absolutePath
+                        !relativePath.isNullOrBlank() && volumeRoot != null ->
+                            File(volumeRoot, relativePath + name).absolutePath
                         else -> continue
                     }
-
                     val file = File(path)
                     val size = if (sizeColumn >= 0) cursor.getLong(sizeColumn).coerceAtLeast(0L) else 0L
                     val modifiedSeconds = if (modifiedColumn >= 0) cursor.getLong(modifiedColumn) else 0L
                     val modifiedMillis = if (modifiedSeconds > 0L) modifiedSeconds * 1000L else 0L
-
                     destination[file.absolutePath] = IndexedDocument(
                         file = file,
                         name = name,
@@ -391,35 +418,63 @@ object DocumentScanner {
     }
 
     @Suppress("DEPRECATION")
+    private fun resolveVolumeRoot(context: Context, volumeName: String): File? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            volumeName == MediaStore.VOLUME_EXTERNAL_PRIMARY ||
+            volumeName == MediaStore.VOLUME_EXTERNAL
+        ) {
+            return Environment.getExternalStorageDirectory()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val storageManager = context.getSystemService(StorageManager::class.java)
+            val matched = runCatching {
+                storageManager?.storageVolumes?.firstOrNull {
+                    it.uuid?.equals(volumeName, ignoreCase = true) == true
+                }?.directory
+            }.getOrNull()
+            if (matched != null) return matched
+        }
+        return null
+    }
+
+    @Suppress("DEPRECATION")
+    private fun discoverStorageRoots(context: Context): List<File> {
+        val roots = linkedSetOf<File>()
+        roots.add(Environment.getExternalStorageDirectory())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val storageManager = context.getSystemService(StorageManager::class.java)
+            runCatching {
+                storageManager?.storageVolumes?.mapNotNullTo(roots) { it.directory }
+            }
+        }
+        // Some OEMs expose removable volumes through getExternalFilesDirs before
+        // StorageManager returns a directory. Walk back from Android/data/<app>/files.
+        context.getExternalFilesDirs(null).filterNotNull().forEach { appFolder ->
+            var root: File? = appFolder
+            repeat(4) { root = root?.parentFile }
+            root?.let { roots.add(it) }
+        }
+        return roots.filter { it.exists() && it.isDirectory }
+    }
+
+    @Suppress("DEPRECATION")
     private fun scanKnownFolders(
         context: Context,
         destination: MutableMap<String, IndexedDocument>
-    ) {
-        val storageRoot = Environment.getExternalStorageDirectory()
-        val roots = linkedSetOf(
-            storageRoot,
-            File(storageRoot, Environment.DIRECTORY_DOWNLOADS),
-            File(storageRoot, Environment.DIRECTORY_DOCUMENTS),
-            File(storageRoot, Environment.DIRECTORY_DCIM),
-            File(storageRoot, Environment.DIRECTORY_PICTURES),
-            File(storageRoot, Environment.DIRECTORY_MOVIES),
-            File(storageRoot, "Bluetooth"),
-            File(storageRoot, "WhatsApp"),
-            File(storageRoot, "Telegram"),
-            File(storageRoot, "Android/media"),
-            File(storageRoot, "Android/media/com.whatsapp/WhatsApp/Media"),
-            File(storageRoot, "Android/media/org.telegram.messenger/Telegram"),
-            File(storageRoot, "Android/media/org.telegram.messenger/Telegram/Telegram Documents")
-        )
-
+    ): FolderScanStats {
+        val roots = discoverStorageRoots(context)
         val stack = ArrayDeque<Pair<File, Int>>()
-        roots.filter { it.isDirectory && it.canRead() }.forEach { stack.add(it to 0) }
+        // Add in reverse so the primary shared-storage root is visited first.
+        roots.asReversed().forEach { stack.add(it to 0) }
         var added = 0
         var visited = 0
+        var inaccessible = 0
+        val startedAt = SystemClock.elapsedRealtime()
 
         while (stack.isNotEmpty() &&
             added < MAX_FALLBACK_RESULTS &&
-            visited < MAX_FALLBACK_DIRECTORIES
+            visited < MAX_FALLBACK_DIRECTORIES &&
+            SystemClock.elapsedRealtime() - startedAt < MAX_FALLBACK_SCAN_MS
         ) {
             val (directory, depth) = stack.removeLast()
             visited++
@@ -429,16 +484,27 @@ object DocumentScanner {
                 null
             } catch (_: RuntimeException) {
                 null
-            } ?: continue
+            }
+            if (children == null) {
+                inaccessible++
+                continue
+            }
 
             for (child in children) {
                 if (added >= MAX_FALLBACK_RESULTS) break
                 if (child.isHidden || child.name.startsWith(".")) continue
 
                 if (child.isDirectory) {
+                    if (child.name.equals("Android", true)) {
+                        // Android/data and Android/obb are restricted. Android/media
+                        // is shared storage and includes media from other apps.
+                        val sharedMedia = File(child, "media")
+                        if (sharedMedia.isDirectory) stack.add(sharedMedia to depth + 2)
+                        continue
+                    }
                     if (depth < MAX_FALLBACK_DEPTH &&
-                        child.name != "Android" &&
-                        !child.name.equals("cache", true)
+                        !child.name.equals("cache", true) &&
+                        !child.name.equals("obb", true)
                     ) {
                         stack.add(child to depth + 1)
                     }
@@ -453,5 +519,15 @@ object DocumentScanner {
                 }
             }
         }
+
+        val timedOut = stack.isNotEmpty() &&
+            SystemClock.elapsedRealtime() - startedAt >= MAX_FALLBACK_SCAN_MS
+        return FolderScanStats(
+            rootsFound = roots.size,
+            directoriesVisited = visited,
+            inaccessibleDirectories = inaccessible,
+            documentsAdded = added,
+            timedOut = timedOut
+        )
     }
 }
