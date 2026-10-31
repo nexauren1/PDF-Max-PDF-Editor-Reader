@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -445,15 +446,67 @@ private fun FilesPage(en: Boolean, fileName: String, openPdf: () -> Unit, openRe
 }
 
 @Composable
+private fun toolCategory(title: String): String = when (title) {
+    "Editar PDF", "Adicionar texto", "Marca de água", "Assinar PDF", "Preencher formulários", "Editar metadados" -> "Edit"
+    "Juntar PDF", "Dividir PDF", "Organizar páginas", "Remover páginas", "Extrair páginas",
+    "Adicionar página em branco", "Rodar páginas" -> "Organize"
+    "Converter PDF", "PDF para imagem", "Imagem para PDF", "Extrair imagens", "Extrair texto PDF", "Criar PDF" -> "Convert"
+    "Proteger PDF" -> "Security"
+    "Digitalizar e OCR" -> "Scan"
+    else -> "Utilities"
+}
+
 private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
     var query by remember { mutableStateOf("") }
-    val visibleTools = tools.filter {
+    var selectedCategory by remember { mutableStateOf("All") }
+    val categories = listOf("All", "Edit", "Organize", "Convert", "Security", "Scan", "Utilities")
+    val categoryLabels = categories.associateWith { key ->
+        when (key) {
+            "All" -> if (en) "All tools" else "Todas"
+            "Edit" -> if (en) "Edit" else "Editar"
+            "Organize" -> if (en) "Organize" else "Organizar"
+            "Convert" -> if (en) "Convert" else "Converter"
+            "Security" -> if (en) "Security" else "Segurança"
+            "Scan" -> if (en) "Scan & OCR" else "Digitalizar e OCR"
+            else -> if (en) "Utilities" else "Utilitários"
+        }
+    }
+    val categoryTools = tools.filter { selectedCategory == "All" || toolCategory(it.title) == selectedCategory }
+    val visibleTools = categoryTools.filter {
         query.isBlank() || it.title.contains(query, true) || it.subtitle.contains(query, true) ||
             localizedToolTitle(it.title, en).contains(query, true) ||
             localizedToolSubtitle(it.title, en).contains(query, true)
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
-        PageTitle(if (en) "All tools" else "Todas as ferramentas", if (en) "A complete workspace for PDF documents" else "Um espaço completo para trabalhar com documentos PDF")
+        PageTitle(
+            if (en) "All tools" else "Todas as ferramentas",
+            if (en) "A complete workspace for PDF documents" else "Um espaço completo para trabalhar com documentos PDF"
+        )
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF142F57), Color(0xFF10213B))))
+                .border(1.dp, Color(0xFF294C7B), RoundedCornerShape(16.dp))
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(43.dp).clip(RoundedCornerShape(13.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF168DEB), Color(0xFF7555F6)))),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(if (en) "Your document toolkit" else "O seu conjunto de ferramentas", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(
+                    if (en) "${tools.size} tools · Pick a category to get started" else "${tools.size} ferramentas · Escolha uma categoria para começar",
+                    color = MaxMuted, fontSize = 10.sp
+                )
+            }
+            Icon(Icons.Default.GridView, null, tint = MaxCyan, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.height(14.dp))
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -471,8 +524,38 @@ private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
             },
             colors = darkFieldColors()
         )
+        Spacer(Modifier.height(13.dp))
+        Text(
+            if (en) "BROWSE BY CATEGORY" else "EXPLORAR POR CATEGORIA",
+            color = MaxMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            categories.forEach { category ->
+                val count = if (category == "All") tools.size else tools.count { toolCategory(it.title) == category }
+                FilterChip(
+                    selected = selectedCategory == category,
+                    onClick = { selectedCategory = category },
+                    label = {
+                        Text("${categoryLabels[category]}  $count", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFF164A75),
+                        selectedLabelColor = Color.White,
+                        containerColor = Color(0xFF10213A),
+                        labelColor = MaxMuted
+                    )
+                )
+            }
+        }
         Spacer(Modifier.height(14.dp))
-        SectionTitle(if (en) "PDF tools" else "Ferramentas PDF", visibleTools.size.toString()) {}
+        SectionTitle(
+            if (en) categoryLabels[selectedCategory].orEmpty() else "Ferramentas",
+            visibleTools.size.toString()
+        ) {}
         if (visibleTools.isEmpty()) {
             InfoPanel(
                 if (en) "No tools found" else "Nenhuma ferramenta encontrada",
@@ -483,7 +566,11 @@ private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
             ToolGrid(visibleTools, choose, en)
         }
         Spacer(Modifier.height(18.dp))
-        InfoPanel(if (en) "Powerful document workflow" else "Fluxo de documentos avançado", if (en) "Open a tool to configure its options and select a document." else "Abra uma ferramenta para configurar as opções e selecionar um documento.", Icons.Default.AutoAwesome)
+        InfoPanel(
+            if (en) "A dedicated workspace for every tool" else "Um espaço próprio para cada ferramenta",
+            if (en) "Select your files, watch the processing and review the result before saving." else "Selecione os ficheiros, acompanhe o processamento e reveja o resultado antes de guardar.",
+            Icons.Default.AutoAwesome
+        )
     }
 }
 
