@@ -151,7 +151,7 @@ internal fun PdfCreatorScreen(english: Boolean) {
                         }
                     }
                 }
-                TextButton(onClick = { rows = rows + listOf("", "", "") }) {
+                TextButton(onClick = { rows = rows + listOf(listOf("", "", "")) }) {
                     Icon(Icons.Default.Add, null, tint = MaxCyan); Spacer(Modifier.width(5.dp))
                     Text(if (english) "Add row" else "Adicionar linha", color = MaxCyan)
                 }
