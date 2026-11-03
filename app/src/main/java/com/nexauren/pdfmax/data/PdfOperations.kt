@@ -136,7 +136,7 @@ object PdfOperations {
 
     fun protect(context: Context, input: File, password: String): File {
         init(context)
-        require(password.length >= 4) { "A senha deve ter pelo menos 4 caracteres." }
+        require(password.length >= 8) { "A senha deve ter pelo menos 8 caracteres." }
         val target = output(input, "protected")
         PDDocument.load(input).use { doc ->
             val ownerPassword = ByteArray(32).also { SecureRandom().nextBytes(it) }
