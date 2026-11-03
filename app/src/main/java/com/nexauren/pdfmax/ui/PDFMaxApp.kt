@@ -85,7 +85,10 @@ private val tools = listOf(
     ToolSpec("Detetar duplicados", "Encontrar cópias exatas", Icons.Default.ContentCopy, Color(0xFF9B6BFF)),
     ToolSpec("Extrair páginas", "Criar um PDF com páginas escolhidas", Icons.Default.Description, Color(0xFF398BFF)),
     ToolSpec("Adicionar página em branco", "Inserir uma nova página", Icons.Default.NoteAdd, Color(0xFF16B89B)),
-    ToolSpec("Editar metadados", "Título, autor e palavras-chave", Icons.Default.EditNote, Color(0xFFFF8A45))
+    ToolSpec("Editar metadados", "Título, autor e palavras-chave", Icons.Default.EditNote, Color(0xFFFF8A45)),
+    ToolSpec("Achatar formulários", "Transformar campos AcroForm em conteúdo fixo", Icons.Default.Layers, Color(0xFF17AFA0)),
+    ToolSpec("Remover metadados", "Limpar autor, título, datas e XMP do documento", Icons.Default.PrivacyTip, Color(0xFFE66A83)),
+    ToolSpec("Relatório do PDF", "Contagem de páginas, palavras e texto extraível", Icons.Default.Analytics, Color(0xFF5A91F3))
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,7 +147,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                 BottomBar(
                     Modifier.fillMaxWidth(), screen, english,
                     { go(Page.HOME) }, { go(Page.FILES) },
-                    { go(Page.FILES) },
+                    { go(Page.CREATE_PDF) },
                     { go(Page.TOOLS) }, { scope.launch { drawer.open() } }
                 )
             }
@@ -154,7 +157,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                     .background(Brush.verticalGradient(listOf(Color(0xFF071329), Color(0xFF08162B), Color(0xFF050E20))))
             ) {
                 AnimatedContent(
-                    targetState = screen,
+                    targetState = screen to (if (screen == Page.TOOL) currentTool else tools.first()),
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     transitionSpec = {
                         (fadeIn(animationSpec = tween(220)) +
@@ -163,8 +166,9 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                                 slideOutHorizontally(animationSpec = tween(160)) { width -> -width / 24 })
                     },
                     label = "PDF Max screen transition"
-                ) { targetScreen ->
-                    when (targetScreen) {
+                ) { destination ->
+                    val (targetPage, targetTool) = destination
+                    when (targetPage) {
                         Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { go(Page.FILES) }, ::openLocalFile)
                         Page.FILES -> DocumentLibraryScreen(english, ::openLocalFile)
                         Page.FAVORITES -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Favorites")
@@ -179,7 +183,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                         Page.SCANNER -> ToolWorkspaceScreen(tools.first { it.title == "Digitalizar e OCR" }, english)
                         Page.PROTECT -> ToolWorkspaceScreen(tools.first { it.title == "Proteger PDF" }, english)
                         Page.SETTINGS -> SettingsPage(english, { toggleLanguage() })
-                        Page.TOOL -> ToolWorkspaceScreen(currentTool, english)
+                        Page.TOOL -> ToolWorkspaceScreen(targetTool, english)
                     }
                 }
             }
