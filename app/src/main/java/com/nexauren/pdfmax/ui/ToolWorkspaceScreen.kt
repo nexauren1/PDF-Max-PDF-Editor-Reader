@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -145,6 +146,19 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         } else permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
+    LaunchedEffect(tool.title) {
+        selectedPath = null
+        selectedPaths = emptySet()
+        query = ""
+        showAll = false
+        outputMessage = null
+        resultFiles = emptyList()
+        resultFailed = false
+        resultSaved = false
+        flowStage = ToolFlowStage.SELECT
+        refresh()
+    }
+
     LaunchedEffect(Unit) {
         refresh()
         while (true) {
@@ -245,7 +259,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                                 "\\nPalavras extraídas: " + words +
                                 "\\nLinhas de texto: " + lines +
                                 "\\nCaracteres: " + extracted.length +
-                                if (extracted.isBlank()) "\\nAviso: não foi encontrado texto selecionável; execute OCR se o documento for uma digitalização." else ""
+                                if (extracted.isBlank()) "\nAviso: não foi encontrado texto selecionável; execute OCR se o documento for uma digitalização." else ""
                             emptyList()
                         }
                         "Extrair texto PDF" -> listOf(DocumentUtilityOperations.extractTextToFile(context, file!!))
@@ -652,19 +666,9 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     } else {
 
     Column(Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(53.dp).clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(listOf(tool.color, tool.color.copy(alpha = 0.55f)))), contentAlignment = Alignment.Center) {
-                Icon(tool.icon, null, tint = Color.White, modifier = Modifier.size(29.dp))
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(localizedToolTitle(tool.title, english), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 19.sp)
-                Text(localizedToolSubtitle(tool.title, english), color = MaxMuted, fontSize = 10.sp)
-            }
-            Icon(Icons.Default.AutoAwesome, null, tint = tool.color)
-        }
-        Spacer(Modifier.height(14.dp))
-        Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(Brush.horizontalGradient(listOf(tool.color, MaxBlue, MaxViolet))))
+        ToolIdentityPanel(tool, english)
+        Spacer(Modifier.height(13.dp))
+        ToolStepIndicator(flowStage, tool.color, english)
         Spacer(Modifier.height(16.dp))
 
         if (!access) {
@@ -679,7 +683,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         } else {
             ToolPanel(if (english) "1 · Select document" else "1 · Selecionar documento", tool.color) {
                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = MaxCyan)
-                OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text(if (english) "Search your files" else "Pesquisar os seus ficheiros") }, colors = toolFieldColors())
+                OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text(if (english) "Search your files" else "Pesquisar os seus ficheiros") }, colors = toolFieldColors(tool.color))
                 if (tool.title == "Detetar duplicados") {
                     InfoLine(if (english) "PDF Max will scan the complete internal library and compare SHA-256 hashes. It will never delete files automatically." else "O PDF Max vai analisar toda a biblioteca interna e comparar hashes SHA-256. Nunca elimina ficheiros automaticamente.", Icons.Default.ContentCopy)
                 } else if (needsMultiple) {
@@ -724,8 +728,8 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
             ToolPanel(if (english) "2 · Options" else "2 · Opções", tool.color) {
                 when (tool.title) {
                     "Dividir PDF" -> {
-                        NumberField(if (english) "First page" else "Primeira página", firstPage) { firstPage = it }
-                        NumberField(if (english) "Last page" else "Última página", lastPage) { lastPage = it }
+                        NumberField(if (english) "First page" else "Primeira página", firstPage, tool.color) { firstPage = it }
+                        NumberField(if (english) "Last page" else "Última página", lastPage, tool.color) { lastPage = it }
                     }
                     "Rodar páginas" -> {
                         Text(if (english) "Rotation" else "Rotação", color = MaxMuted, fontSize = 10.sp)
@@ -751,7 +755,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         InfoLine(if (english) "A new PDF is created with only the pages you list, in the same order." else "É criado um novo PDF apenas com as páginas indicadas, na mesma ordem.", Icons.Default.Description)
                     }
                     "Adicionar página em branco" -> {
-                        NumberField(if (english) "Insert after page (0 = first page)" else "Inserir depois da página (0 = primeira página)", pageAfter) { pageAfter = it }
+                        NumberField(if (english) "Insert after page (0 = first page)" else "Inserir depois da página (0 = primeira página)", pageAfter, tool.color) { pageAfter = it }
                         InfoLine(if (english) "A blank A4 page is inserted at the selected position. The original PDF stays unchanged." else "É inserida uma página A4 em branco na posição indicada. O PDF original não é alterado.", Icons.Default.NoteAdd)
                     }
                     "Editar metadados" -> {
@@ -834,12 +838,9 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             Text(if (english) "Google Translate" else "Google Tradutor", color = tool.color, fontSize = 10.sp)
                         }
                     }
-                    "Preencher formulários" -> InfoLine(if (english) "Fill existing AcroForm text fields in the selected PDF." else "Preencha campos AcroForm de texto existentes no PDF selecionado.", Icons.Default.EditNote)
                     "Achatar formulários" -> InfoLine(if (english) "Convert current AcroForm field appearances into page content. The fields will no longer be editable." else "Transforme a aparência atual dos campos AcroForm em conteúdo das páginas. Os campos deixam de ser editáveis.", Icons.Default.Layers)
                     "Remover metadados" -> InfoLine(if (english) "Create a copy without standard document information or the catalog XMP stream. Embedded object metadata may remain." else "Crie uma cópia sem as informações padrão do documento nem o fluxo XMP do catálogo. Metadados dentro de objetos incorporados podem permanecer.", Icons.Default.PrivacyTip)
                     "Relatório do PDF" -> InfoLine(if (english) "Inspect page count, file size, extracted words, lines and characters. Image-only scans may require OCR." else "Analise o número de páginas, tamanho, palavras, linhas e caracteres extraídos. Digitalizações só com imagem podem precisar de OCR.", Icons.Default.Analytics)
-                    "Organizar páginas" -> InfoLine(if (english) "Reorder PDF pages using the comma-separated page order above." else "Reordene páginas do PDF com a ordem de números separada por vírgulas acima.", Icons.Default.GridView)
-                    "Remover páginas" -> InfoLine(if (english) "Remove the selected page numbers and save a new PDF." else "Remova as páginas indicadas e guarde um novo PDF.", Icons.Default.Delete)
                     else -> InfoLine(if (english) "Choose a source document to continue." else "Escolha um documento de origem para continuar.", tool.icon)
                 }
             }
@@ -889,8 +890,117 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
 }
 
 @Composable
+private fun ToolIdentityPanel(tool: ToolSpec, english: Boolean) {
+    val (kicker, intro, tags) = when (tool.title) {
+        "Editar PDF", "Adicionar texto", "Marca de água", "Numerar páginas" -> Triple(
+            if (english) "DOCUMENT DESIGN STUDIO" else "ESTÚDIO DE DESIGN DOCUMENTAL",
+            if (english) "Add clear, controlled visual changes to a new PDF copy." else "Adicione alterações visuais controladas a uma nova cópia do PDF.",
+            listOf(if (english) "TEXT LAYERS" else "CAMADAS DE TEXTO", if (english) "PREVIEW RESULT" else "REVER RESULTADO")
+        )
+        "Juntar PDF", "Dividir PDF", "Organizar páginas", "Extrair páginas", "Remover páginas", "Rodar páginas", "Adicionar página em branco" -> Triple(
+            if (english) "PAGE CONTROL ENGINE" else "MOTOR DE ORGANIZAÇÃO DE PÁGINAS",
+            if (english) "Arrange document structure while keeping the source file untouched." else "Organize a estrutura do documento sem alterar o ficheiro original.",
+            listOf(if (english) "PAGE WORKFLOW" else "FLUXO DE PÁGINAS", if (english) "NEW COPY" else "NOVA CÓPIA")
+        )
+        "Converter PDF" -> Triple(
+            if (english) "FORMAT CONVERSION LAB" else "LABORATÓRIO DE CONVERSÃO",
+            if (english) "Convert supported documents and review the exported file before saving." else "Converta documentos compatíveis e reveja o ficheiro exportado antes de guardar.",
+            listOf(if (english) "OFFICE EXPORT" else "EXPORTAÇÃO OFFICE", if (english) "LOCAL OUTPUT" else "RESULTADO LOCAL")
+        )
+        "Proteger PDF", "Assinar PDF", "Preencher formulários", "Achatar formulários", "Remover metadados" -> Triple(
+            if (english) "DOCUMENT SECURITY" else "SEGURANÇA DOCUMENTAL",
+            if (english) "Apply a focused protection or privacy operation to a separate copy." else "Aplique uma operação específica de protecção ou privacidade numa cópia separada.",
+            listOf(if (english) "SOURCE PRESERVED" else "ORIGINAL PRESERVADO", if (english) "REVIEW FIRST" else "REVER ANTES")
+        )
+        "Digitalizar e OCR", "Imagem para PDF", "PDF para imagem", "Extrair imagens" -> Triple(
+            if (english) "IMAGE & OCR WORKSPACE" else "ESPAÇO DE IMAGEM E OCR",
+            if (english) "Process scans and images into clean, reusable document output." else "Processe digitalizações e imagens para criar documentos limpos e reutilizáveis.",
+            listOf(if (english) "IMAGE PIPELINE" else "FLUXO DE IMAGEM", if (english) "ON DEVICE" else "NO DISPOSITIVO")
+        )
+        "Traduzir PDF" -> Triple(
+            if (english) "LANGUAGE WORKSPACE" else "ESPAÇO DE TRADUÇÃO",
+            if (english) "Translate selectable document text with downloadable language models." else "Traduza o texto seleccionável com modelos de idioma descarregáveis.",
+            listOf(if (english) "LANGUAGE MODELS" else "MODELOS DE IDIOMA", if (english) "REVIEW TEXT" else "REVER TEXTO")
+        )
+        "Comprimir PDF", "Reparar PDF" -> Triple(
+            if (english) "PDF OPTIMIZATION ENGINE" else "MOTOR DE OPTIMIZAÇÃO PDF",
+            if (english) "Rebuild the PDF and inspect the actual output size and integrity." else "Regrave o PDF e verifique o tamanho e o resultado real.",
+            listOf(if (english) "FILE ANALYSIS" else "ANÁLISE DO FICHEIRO", if (english) "NO GUARANTEES" else "RESULTADO VERIFICADO")
+        )
+        else -> Triple(
+            if (english) "DOCUMENT INTELLIGENCE" else "INTELIGÊNCIA DOCUMENTAL",
+            if (english) "Run a focused operation on selected files and inspect its result." else "Execute uma operação específica nos ficheiros seleccionados e inspeccione o resultado.",
+            listOf(if (english) "LOCAL WORKSPACE" else "ESPAÇO LOCAL", if (english) "CONTROLLED FLOW" else "FLUXO CONTROLADO")
+        )
+    }
+    val shape = RoundedCornerShape(22.dp)
+    Column(
+        Modifier.fillMaxWidth()
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(tool.color.copy(alpha = 0.28f), Color(0xFF10172F), Color(0xFF09182D))))
+            .border(1.dp, tool.color.copy(alpha = 0.48f), shape)
+            .padding(15.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(66.dp).clip(RoundedCornerShape(19.dp))
+                    .background(Brush.linearGradient(listOf(tool.color, tool.color.copy(alpha = 0.38f))))
+                    .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(19.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(tool.icon, null, tint = Color.White, modifier = Modifier.size(34.dp))
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f)) {
+                Text(kicker, color = tool.color, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.25.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(localizedToolTitle(tool.title, english), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp, lineHeight = 24.sp)
+                Text(localizedToolSubtitle(tool.title, english), color = Color(0xFFB8C9E5), fontSize = 10.sp, lineHeight = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Spacer(Modifier.height(13.dp))
+        Text(intro, color = Color(0xFFD1DDF1), fontSize = 10.sp, lineHeight = 15.sp)
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+            tags.forEach { tag ->
+                Box(Modifier.clip(CircleShape).background(tool.color.copy(alpha = 0.16f)).border(1.dp, tool.color.copy(alpha = 0.34f), CircleShape).padding(horizontal = 9.dp, vertical = 6.dp)) {
+                    Text(tag, color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp)
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Icon(Icons.Default.AutoAwesome, null, tint = tool.color, modifier = Modifier.size(17.dp))
+        }
+    }
+}
+
+@Composable
+private fun ToolStepIndicator(stage: ToolFlowStage, accent: Color, english: Boolean) {
+    val labels = if (english) listOf("01  SELECT", "02  PROCESS", "03  RESULT") else listOf("01  SELECÇÃO", "02  PROCESSAMENTO", "03  RESULTADO")
+    val active = when (stage) {
+        ToolFlowStage.SELECT -> 0
+        ToolFlowStage.PROCESSING -> 1
+        ToolFlowStage.RESULT -> 2
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        labels.forEachIndexed { index, label ->
+            val selected = index == active
+            val completed = index < active
+            Box(
+                Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
+                    .background(if (selected || completed) accent.copy(alpha = if (selected) 0.22f else 0.11f) else Color(0xFF101F37))
+                    .border(1.dp, if (selected) accent.copy(alpha = 0.78f) else Color(0xFF263B59), RoundedCornerShape(9.dp))
+                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(label, color = if (selected || completed) Color.White else MaxMuted, fontSize = 7.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
 private fun ToolPanel(title: String, accent: Color, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(bottom = 14.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF0E203B)).padding(13.dp)) {
+    Column(Modifier.fillMaxWidth().padding(bottom = 14.dp).clip(RoundedCornerShape(16.dp)).background(Brush.verticalGradient(listOf(accent.copy(alpha = 0.13f), Color(0xFF0A1A31)))).border(1.dp, accent.copy(alpha = 0.22f), RoundedCornerShape(16.dp)).padding(13.dp)) {
         Text(title, color = accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         Spacer(Modifier.height(9.dp))
         content()
@@ -898,8 +1008,8 @@ private fun ToolPanel(title: String, accent: Color, content: @Composable ColumnS
 }
 
 @Composable
-private fun NumberField(label: String, value: String, change: (String) -> Unit) {
-    OutlinedTextField(value, change, modifier = Modifier.fillMaxWidth(), label = { Text(label) }, singleLine = true, colors = toolFieldColors())
+private fun NumberField(label: String, value: String, accent: Color = MaxBlue, change: (String) -> Unit) {
+    OutlinedTextField(value, change, modifier = Modifier.fillMaxWidth(), label = { Text(label) }, singleLine = true, colors = toolFieldColors(accent))
 }
 
 @Composable
@@ -919,10 +1029,10 @@ private fun InfoLine(text: String, icon: androidx.compose.ui.graphics.vector.Ima
 }
 
 @Composable
-private fun toolFieldColors() = OutlinedTextFieldDefaults.colors(
+private fun toolFieldColors(accent: Color = MaxBlue) = OutlinedTextFieldDefaults.colors(
     focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-    focusedBorderColor = MaxBlue, unfocusedBorderColor = Color(0xFF304766),
-    focusedLabelColor = MaxCyan, unfocusedLabelColor = MaxMuted,
-    cursorColor = MaxCyan, focusedContainerColor = Color(0xFF0D1D35),
+    focusedBorderColor = accent, unfocusedBorderColor = accent.copy(alpha = 0.48f),
+    focusedLabelColor = accent, unfocusedLabelColor = MaxMuted,
+    cursorColor = accent, focusedContainerColor = Color(0xFF0D1D35),
     unfocusedContainerColor = Color(0xFF0D1D35)
 )
