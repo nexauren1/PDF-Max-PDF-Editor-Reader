@@ -474,6 +474,36 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                     )
                 }
             }
+
+            if (tool.title == "Traduzir PDF" && resultFiles.isNotEmpty() && !resultFailed) {
+                Spacer(Modifier.height(12.dp))
+                ToolPanel(if (english) "Powered by Google Translate" else "Com tecnologia do Google Tradutor", tool.color) {
+                    Text(
+                        if (english) "This is an automatic translation. Review names, numbers and important terms before relying on it. Translation quality can vary by language."
+                        else "Esta é uma tradução automática. Reveja nomes, números e termos importantes antes de utilizar o documento. A qualidade pode variar conforme os idiomas.",
+                        color = MaxMuted, fontSize = 10.sp, lineHeight = 15.sp
+                    )
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        if (english) "THIS SERVICE MAY CONTAIN TRANSLATIONS POWERED BY GOOGLE. GOOGLE DISCLAIMS ALL WARRANTIES RELATED TO THE TRANSLATIONS, EXPRESS OR IMPLIED, INCLUDING ANY WARRANTIES OF ACCURACY, RELIABILITY, AND ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT."
+                        else "ESTE SERVIÇO PODE CONTER TRADUÇÕES COM TECNOLOGIA DO GOOGLE. A GOOGLE REJEITA TODAS AS GARANTIAS RELACIONADAS COM AS TRADUÇÕES, EXPRESSAS OU IMPLÍCITAS, INCLUINDO GARANTIAS DE EXATIDÃO, FIABILIDADE, COMERCIALIZAÇÃO, ADEQUAÇÃO A UM FIM ESPECÍFICO E NÃO INFRAÇÃO.",
+                        color = MaxMuted, fontSize = 8.sp, lineHeight = 12.sp
+                    )
+                    TextButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://translate.google.com")))
+                            }
+                        },
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            if (english) "Learn about Google Translate" else "Conhecer o Google Tradutor",
+                            color = tool.color, fontSize = 10.sp
+                        )
+                    }
+                }
+            }
             if (tool.title == "Comprimir PDF" && selected != null && resultFiles.size == 1) {
                 Spacer(Modifier.height(14.dp))
                 val originalBytes = selected.length()
@@ -777,9 +807,19 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             }
                         }
                         InfoLine(
-                            if (english) "Translation runs on this device. The first use downloads the selected language models over Wi-Fi." else "A tradução é executada neste dispositivo. Na primeira utilização, os modelos de idioma são descarregados por Wi-Fi.",
+                            if (english) "Translate with Google using on-device ML Kit. The first use downloads the selected language models over Wi-Fi. Quality can vary by language." else "Traduzir com o Google através do ML Kit no dispositivo. Na primeira utilização, os modelos selecionados são descarregados por Wi-Fi. A qualidade pode variar conforme os idiomas.",
                             Icons.Default.Translate
                         )
+                        TextButton(
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://translate.google.com")))
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 3.dp)
+                        ) {
+                            Text(if (english) "Google Translate" else "Google Tradutor", color = tool.color, fontSize = 10.sp)
+                        }
                     }
                     "Preencher formulários" -> InfoLine(if (english) "Fill existing AcroForm text fields in the selected PDF." else "Preencha campos AcroForm de texto existentes no PDF selecionado.", Icons.Default.EditNote)
                     "Organizar páginas" -> InfoLine(if (english) "Reorder PDF pages using the comma-separated page order above." else "Reordene páginas do PDF com a ordem de números separada por vírgulas acima.", Icons.Default.GridView)
@@ -798,7 +838,14 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                 if (running) CircularProgressIndicator(Modifier.size(19.dp), color = Color.White, strokeWidth = 2.dp)
                 else Icon(Icons.Default.AutoAwesome, null, tint = Color.White)
                 Spacer(Modifier.width(9.dp))
-                Text(if (running) { if (english) "Processing…" else "A processar…" } else { if (english) "Start " + localizedToolTitle(tool.title, true) else "Iniciar " + tool.title }, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(
+                    when {
+                        running -> if (english) "Processing…" else "A processar…"
+                        tool.title == "Traduzir PDF" -> if (english) "Translate with Google" else "Traduzir com o Google"
+                        else -> if (english) "Start " + localizedToolTitle(tool.title, true) else "Iniciar " + tool.title
+                    },
+                    color = Color.White, fontWeight = FontWeight.Bold
+                )
             }
 
             outputMessage?.let { message ->
