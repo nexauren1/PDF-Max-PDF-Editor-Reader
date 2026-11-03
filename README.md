@@ -52,6 +52,7 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 ## Known limitations
 
 - Legacy binary DOC/XLS/PPT files can be indexed, but local preview/conversion is not implemented. Save them as DOCX/XLSX/PPTX first.
+- Embedded JPEG 2000 / JPX images are not guaranteed to render because the optional decoder is not bundled in this release.
 - PDF-to-Office exports preserve selectable text, not the original page layout, typography, complex tables or embedded images.
 - Adding text is an overlay; it does not rewrite existing PDF text objects.
 - The handwritten signature is a visible handwritten stamp, not a certificate-backed cryptographic digital signature.
