@@ -36,7 +36,32 @@ object PdfOperations {
 
     private fun output(input: File, suffix: String, extension: String = "pdf"): File {
         val base = input.nameWithoutExtension.replace(Regex("[^A-Za-z0-9_-]"), "_")
-        return File(outputDirectory(), base + "_" + suffix + "." + extension)
+        val directory = outputDirectory()
+        val first = File(directory, base + "_" + suffix + "." + extension)
+        if (!first.exists()) return first
+        var attempt = 2
+        var candidate: File
+        do {
+            candidate = File(directory, base + "_" + suffix + "_" + System.currentTimeMillis() + "_" + attempt + "." + extension)
+            attempt++
+        } while (candidate.exists())
+        return candidate
+    }
+
+    /** Decodes large camera/gallery images at a safe working resolution for PDF pages. */
+    fun decodeImageForPdf(imageFile: File, maxDimension: Int = 2560): Bitmap {
+        require(imageFile.isFile && imageFile.canRead()) { "Não foi possível ler " + imageFile.name + "." }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(imageFile.absolutePath, bounds)
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "O ficheiro de imagem não é válido." }
+        var sample = 1
+        while (maxOf(bounds.outWidth / sample, bounds.outHeight / sample) > maxDimension) sample *= 2
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        return BitmapFactory.decodeFile(imageFile.absolutePath, options)
+            ?: error("Não foi possível descodificar a imagem.")
     }
 
     private fun init(context: Context) = PDFBoxResourceLoader.init(context.applicationContext)
@@ -44,11 +69,11 @@ object PdfOperations {
     fun merge(context: Context, inputs: List<File>): File {
         require(inputs.size >= 2) { "Selecione pelo menos dois PDFs." }
         init(context)
-        val target = File(outputDirectory(), "PDF_Max_Merged_" + System.currentTimeMillis() + ".pdf")
+        val target = File(outputDirectory(), "PDF_Max_Merged_" + System.currentTimeMillis() + "_" + System.nanoTime() + ".pdf")
         val merger = PDFMergerUtility()
         inputs.forEach { require(it.extension.equals("pdf", true)); merger.addSource(it) }
         merger.destinationFileName = target.absolutePath
-        merger.mergeDocuments(MemoryUsageSetting.setupMainMemoryOnly())
+        merger.mergeDocuments(MemoryUsageSetting.setupTempFileOnly())
         return target
     }
 
@@ -135,21 +160,24 @@ object PdfOperations {
 
     fun imageToPdf(context: Context, image: File): File {
         init(context)
-        val target = File(outputDirectory(), image.nameWithoutExtension + "_PDF_Max.pdf")
-        val bitmap = BitmapFactory.decodeFile(image.absolutePath) ?: error("Não foi possível abrir a imagem.")
-        PDDocument().use { doc ->
-            val page = PDPage(PDRectangle.A4)
-            doc.addPage(page)
-            val imageObject = LosslessFactory.createFromImage(doc, bitmap)
-            val pageW = page.mediaBox.width
-            val pageH = page.mediaBox.height
-            val scale = minOf((pageW - 48f) / bitmap.width, (pageH - 48f) / bitmap.height)
-            val width = bitmap.width * scale
-            val height = bitmap.height * scale
-            PDPageContentStream(doc, page).use { it.drawImage(imageObject, (pageW - width) / 2f, (pageH - height) / 2f, width, height) }
-            doc.save(target)
+        val target = output(image, "converted_to_pdf")
+        val bitmap = decodeImageForPdf(image)
+        try {
+            PDDocument().use { doc ->
+                val page = PDPage(PDRectangle.A4)
+                doc.addPage(page)
+                val imageObject = LosslessFactory.createFromImage(doc, bitmap)
+                val pageW = page.mediaBox.width
+                val pageH = page.mediaBox.height
+                val scale = minOf((pageW - 48f) / bitmap.width, (pageH - 48f) / bitmap.height)
+                val width = bitmap.width * scale
+                val height = bitmap.height * scale
+                PDPageContentStream(doc, page).use { it.drawImage(imageObject, (pageW - width) / 2f, (pageH - height) / 2f, width, height) }
+                doc.save(target)
+            }
+        } finally {
+            bitmap.recycle()
         }
-        bitmap.recycle()
         return target
     }
 
