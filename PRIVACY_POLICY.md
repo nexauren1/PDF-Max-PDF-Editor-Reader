@@ -26,9 +26,15 @@ Sharing or printing starts only after you choose the corresponding action. Andro
 
 The Internet permission is used for required model downloads and related Google Play services communication. The current app build does not include a developer-operated account system, advertising SDK, analytics SDK or document-upload service. PDF Max does not send document contents to servers operated by the developer.
 
+## ML Kit diagnostics and usage metrics
+
+PDF Max uses Google ML Kit for on-device text recognition and translation. The document text, scan images and translated output are processed on the device and are not sent to Google servers as part of the ML Kit processing itself. However, Google states that its ML Kit Android SDKs collect technical information for diagnostics and usage analytics. This can include device manufacturer/model and Android version, app package/version, per-installation or device identifiers, performance and latency metrics, API configuration, feature input/output size, feature version, event types and error codes. Google says these metrics are encrypted in transit and are not shared with third parties. See Google's [ML Kit Android data disclosure](https://developers.google.com/ml-kit/android-data-disclosure) and [ML Kit terms and privacy](https://developers.google.com/ml-kit/terms).
+
+The first use of on-device translation may also download language models through Google Play services. Google Play services and ML Kit may process technical download and diagnostic information under Google's terms and privacy policy.
+
 ## Information collected by the developer
 
-The current app build does not ask you to create an account and does not collect your name, email address, precise location or contacts. The developer does not receive the private file index, favourites, recent-file list, in-app trash list or reader bookmarks stored on your device.
+The current app build does not ask you to create an account and the developer does not receive your name, email address, precise location, contacts, private file index, favourites, recent-file list, in-app trash list or reader bookmarks. This statement does not exclude the third-party ML Kit diagnostics described above; account for those SDK transmissions in the Google Play Data safety form.
 
 ## Data security and control
 
