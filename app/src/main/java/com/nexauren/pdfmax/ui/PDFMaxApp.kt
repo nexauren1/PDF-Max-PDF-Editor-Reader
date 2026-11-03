@@ -64,7 +64,7 @@ private val tools = listOf(
     ToolSpec("Comprimir PDF", "Regravar e otimizar; tamanho pode variar", Icons.Default.Compress, Color(0xFF18A96B)),
     ToolSpec("Juntar PDF", "Combinar documentos", Icons.Default.MergeType, Color(0xFF9B4DFF)),
     ToolSpec("Dividir PDF", "Separar por páginas", Icons.Default.CallSplit, Color(0xFFFF922E)),
-    ToolSpec("Proteger PDF", "Senha e permissões", Icons.Default.Security, Color(0xFF11AFC0), Page.PROTECT),
+    ToolSpec("Proteger PDF", "Encriptação AES e palavra-passe de abertura", Icons.Default.Security, Color(0xFF11AFC0), Page.PROTECT),
     ToolSpec("Assinar PDF", "Assinatura manuscrita visual", Icons.Default.Draw, Color(0xFF9A59FF)),
     ToolSpec("Digitalizar e OCR", "Documento para PDF", Icons.Default.QrCodeScanner, Color(0xFF2ABF78), Page.SCANNER),
     ToolSpec("Extrair imagens", "Guardar imagens", Icons.Default.Image, Color(0xFF18A5E8)),
