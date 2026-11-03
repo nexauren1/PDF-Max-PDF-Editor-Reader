@@ -72,4 +72,4 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 
 PDF Max requests Android All files access because its core document library discovers and manages compatible documents across shared device storage. Google Play treats `MANAGE_EXTERNAL_STORAGE` as a restricted, high-risk permission: submit the Permissions Declaration Form, explain why a document library's full-device indexing cannot be replaced by a user-selected Storage Access Framework flow, and wait for approval. Approval is not guaranteed. See [Google Play's All files access policy](https://support.google.com/googleplay/android-developer/answer/10467955).
 
-Before Play submission, complete the [Google Play launch checklist](GOOGLE_PLAY_LAUNCH_CHECKLIST.md) and publish the [privacy policy](PRIVACY_POLICY.md) at a stable public URL.
+Prepare the [All files access declaration](GOOGLE_PLAY_PERMISSION_DECLARATION.md) and the bilingual [Google Play listing draft](PLAY_STORE_LISTING.md). Before Play submission, complete the [Google Play launch checklist](GOOGLE_PLAY_LAUNCH_CHECKLIST.md) and publish the [privacy policy](PRIVACY_POLICY.md) at a stable public URL.
