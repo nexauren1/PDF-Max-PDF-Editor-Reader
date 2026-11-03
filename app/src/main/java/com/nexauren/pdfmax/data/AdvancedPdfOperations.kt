@@ -234,6 +234,48 @@ object AdvancedPdfOperations {
         return destination
     }
 
+    /**
+     * Flattens existing AcroForm fields into the page content so their current
+     * appearance is retained and the fields are no longer editable.
+     */
+    fun flattenForms(context: Context, input: File): File {
+        init(context)
+        val destination = target(input, "flattened")
+        PDDocument.load(input).use { document ->
+            val form = document.documentCatalog.acroForm
+                ?: error("Este PDF não contém um formulário AcroForm.")
+            require(form.fields.isNotEmpty()) { "O formulário não contém campos para achatar." }
+            form.flatten()
+            document.save(destination)
+        }
+        return destination
+    }
+
+    /**
+     * Removes the standard document information dictionary and the catalog XMP
+     * metadata stream. It does not remove metadata embedded inside arbitrary
+     * images or other attached objects.
+     */
+    fun removeDocumentMetadata(context: Context, input: File): File {
+        init(context)
+        val destination = target(input, "metadata_removed")
+        PDDocument.load(input).use { document ->
+            val info = document.documentInformation
+            info.title = null
+            info.author = null
+            info.subject = null
+            info.keywords = null
+            info.creator = null
+            info.producer = null
+            info.creationDate = null
+            info.modificationDate = null
+            info.trapped = null
+            document.documentCatalog.metadata = null
+            document.save(destination)
+        }
+        return destination
+    }
+
     private fun writeXlsx(target: File, lines: List<String>) {
         val rows = lines.mapIndexed { index, line ->
             val value = xmlEscape(line.take(32000))
