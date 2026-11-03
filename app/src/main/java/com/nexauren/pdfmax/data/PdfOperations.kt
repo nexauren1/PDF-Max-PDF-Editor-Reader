@@ -24,6 +24,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
 import java.io.FileOutputStream
+import java.security.SecureRandom
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -81,8 +82,11 @@ object PdfOperations {
         init(context)
         PDDocument.load(input).use { source ->
             val start = (firstPage - 1).coerceAtLeast(0)
-            val end = (lastPage - 1).coerceAtMost(source.numberOfPages - 1)
-            require(start <= end && start < source.numberOfPages) { "Intervalo de páginas inválido." }
+            require(firstPage >= 1 && lastPage >= firstPage && lastPage <= source.numberOfPages) {
+                "O intervalo deve estar entre 1 e " + source.numberOfPages + "."
+            }
+            val start = firstPage - 1
+            val end = lastPage - 1
             return (start..end).map { index ->
                 PDDocument().use { one ->
                     one.importPage(source.getPage(index))
@@ -136,7 +140,9 @@ object PdfOperations {
         require(password.length >= 4) { "A senha deve ter pelo menos 4 caracteres." }
         val target = output(input, "protected")
         PDDocument.load(input).use { doc ->
-            val policy = StandardProtectionPolicy(password, password, AccessPermission())
+            val ownerPassword = ByteArray(32).also { SecureRandom().nextBytes(it) }
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            val policy = StandardProtectionPolicy(ownerPassword, password, AccessPermission())
             policy.encryptionKeyLength = 128
             doc.protect(policy)
             doc.save(target)
