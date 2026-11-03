@@ -122,7 +122,7 @@ object PdfOperations {
                     stream.setNonStrokingColor(40, 120, 220)
                     val label = when {
                         numbering -> (index + 1).toString() + " / " + pageCount
-                        else -> text.replace("\\r", " ").replace("\\n", " ").replace("\\t", " ")
+                        else -> text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
                     }
                     stream.newLineAtOffset(if (watermark) page.mediaBox.width / 2f - 90f else 42f, if (watermark) page.mediaBox.height / 2f else 42f)
                     stream.showText(latin(label).take(180))
