@@ -2,12 +2,15 @@
 
 This checklist is separate from the GitHub Release. A successful GitHub build does not mean Google Play has approved the app.
 
-## Package and signing
+## Package, size and signing
 - [x] Target SDK 36 / Android 16.
-- [x] Build Release APK and Android App Bundle (AAB).
+- [x] Configure R8 code shrinking, resource shrinking and ABI-specific release APK outputs (`arm64-v8a` and `armeabi-v7a`).
+- [ ] Review CI-reported APK/AAB sizes and compare with the previous universal APK before accepting the size optimization.
+- [x] Build Release APK splits and Android App Bundle (AAB) in GitHub Actions.
 - [x] Validate the private upload keystore before release builds.
 - [ ] Confirm in Play Console that Play App Signing is enabled and upload the AAB from the stable release.
 - [ ] Verify that the package name `com.nexauren.pdfmax` is the intended permanent application ID.
+- [ ] Install the correct ABI-specific APK on at least one 64-bit ARM and one 32-bit ARM device; also test the AAB through Play internal testing.
 
 ## Restricted file permission
 - [ ] Complete the Google Play Permissions Declaration Form for `MANAGE_EXTERNAL_STORAGE`.
@@ -22,7 +25,8 @@ Policy reference: https://support.google.com/googleplay/android-developer/answer
 - [ ] Complete the Data safety form to match the final SDKs and actual app behaviour.
 - [ ] Complete content rating, target audience, ads declaration and app category.
 - [ ] Provide the 512×512 store icon, feature graphic, phone screenshots and short/full descriptions in Portuguese and English.
-- [ ] Test onboarding, all-files permission, scanning, PDF creation, import/open, sharing, printing and translation on at least one Android 13 device and one Android 15/16 device.
+- [ ] Test onboarding, all-files permission, scanning, PDF creation, import/open, sharing, printing, translation, favourites, recent files, reversible trash, bookmarks, text search, zoom and night mode on at least one Android 13 device and one Android 15/16 device.
+- [ ] Test R8/minified release behaviour for OCR, PDFBox operations, translation model downloads, signing, form filling and Office conversions; compilation alone does not prove these runtime paths.
 
 ## Release checks
 - [ ] Install the signed APK on a clean device and over the previous version; confirm the app updates without losing the library cache unexpectedly.
