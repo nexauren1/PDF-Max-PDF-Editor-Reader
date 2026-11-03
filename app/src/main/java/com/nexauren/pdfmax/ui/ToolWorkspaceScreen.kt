@@ -197,7 +197,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     val eligible = when (tool.title) {
         "Digitalizar e OCR", "Imagem para PDF" -> documents.filter { it.kind == DocumentKind.IMAGE }
         "PDF para imagem", "Extrair imagens", "Juntar PDF", "Dividir PDF", "Comprimir PDF", "Proteger PDF", "Rodar páginas", "Adicionar texto", "Editar PDF", "Marca de água", "Numerar páginas", "Assinar PDF", "Reparar PDF", "Ver propriedades", "Organizar páginas", "Remover páginas", "Traduzir PDF", "Preencher formulários", "Imprimir PDF", "Partilhar PDF", "Extrair texto PDF", "Extrair páginas", "Adicionar página em branco", "Editar metadados", "Achatar formulários", "Remover metadados", "Relatório do PDF" -> documents.filter { it.kind == DocumentKind.PDF }
-        "Converter PDF" -> documents.filter { it.kind == DocumentKind.PDF || it.extension in setOf("docx", "xlsx", "pptx", "jpg", "jpeg", "png") }
+        "Converter PDF" -> documents.filter { it.kind == DocumentKind.PDF || it.extension in setOf("docx", "xlsx", "pptx", "txt", "csv", "md", "log", "jpg", "jpeg", "png") }
         "Criar ZIP", "Detetar duplicados" -> documents
         else -> documents
     }
@@ -250,7 +250,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             emptyList()
                         }
                         "Converter PDF" -> when {
-                            file!!.extension.lowercase() in setOf("docx", "xlsx", "pptx", "txt", "csv", "rtf", "md") -> listOf(AdvancedPdfOperations.officeToPdf(context, file))
+                            file!!.extension.lowercase() in setOf("docx", "xlsx", "pptx", "txt", "csv", "md", "log") -> listOf(AdvancedPdfOperations.officeToPdf(context, file))
                             file.extension.equals("pdf", true) && exportFormat == "Word" -> listOf(PdfOperations.pdfToDocx(context, file))
                             file.extension.equals("pdf", true) && exportFormat == "Excel" -> listOf(AdvancedPdfOperations.pdfToExcel(context, file))
                             file.extension.equals("pdf", true) && exportFormat == "PowerPoint" -> listOf(OfficeExportOperations.pdfToPowerPoint(context, file))
