@@ -23,13 +23,22 @@ object OfficeTextExtractor {
 
     private fun zipXml(file: File, entries: List<String>, tag: String): String = runCatching {
         ZipFile(file).use { zip ->
-            entries.mapNotNull { name ->
-                val entry = zip.getEntry(name) ?: return@mapNotNull null
+            val output = StringBuilder()
+            val pattern = Regex("<$tag(?:\\s+[^>]*)?>(.*?)</$tag>", setOf(RegexOption.DOT_MATCHES_ALL))
+            for (name in entries) {
+                if (output.length >= 120_000) break
+                val entry = zip.getEntry(name) ?: continue
                 val xml = zip.getInputStream(entry).bufferedReader().use { it.readTextBounded(2_000_000) }
-                Regex("<$tag(?:\\s+[^>]*)?>(.*?)</$tag>", setOf(RegexOption.DOT_MATCHES_ALL))
-                    .findAll(xml).map { decode(it.groupValues[1]) }
-                    .filter { it.isNotBlank() }.joinToString(" ")
-            }.filter { it.isNotBlank() }.joinToString("\n\n").take(120_000)
+                for (match in pattern.findAll(xml)) {
+                    if (output.length >= 120_000) break
+                    val decoded = decode(match.groupValues[1])
+                    if (decoded.isNotBlank()) {
+                        if (output.isNotEmpty()) output.append('\\n')
+                        output.append(decoded.take(120_000 - output.length))
+                    }
+                }
+            }
+            output.toString()
         }
     }.getOrElse { "Não foi possível ler o conteúdo deste documento: " + (it.message ?: "formato inválido") }
 
