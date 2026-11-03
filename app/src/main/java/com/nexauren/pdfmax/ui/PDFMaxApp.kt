@@ -208,7 +208,6 @@ private fun TopBar(screen: Page, english: Boolean, onMenu: () -> Unit, onBack: (
             Text(if (english) "PDF Editor & Reader" else "Editor e Leitor de PDF", fontSize = 10.sp, color = MaxMuted)
         }
         IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, null, tint = Color(0xFFC1D2EE)) }
-        IconButton(onClick = {}) { Icon(Icons.Default.NotificationsNone, null, tint = Color(0xFFC1D2EE)) }
     }
 }
 
@@ -931,9 +930,6 @@ private fun EditorPage(en: Boolean, uri: Uri?, openPdf: () -> Unit, choose: (Too
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(if (en) "Edit PDF" else "Editar PDF", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            IconButton(onClick = {}) { Icon(Icons.Default.Undo, null, tint = MaxText) }
-            IconButton(onClick = {}) { Icon(Icons.Default.Redo, null, tint = MaxText) }
-            IconButton(onClick = {}) { Icon(Icons.Default.Check, null, tint = Color(0xFF55D6A4)) }
         }
         PdfPagePreview(uri)
         Spacer(Modifier.height(10.dp))
