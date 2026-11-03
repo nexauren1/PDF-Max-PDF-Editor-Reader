@@ -36,6 +36,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nexauren.pdfmax.ui.theme.*
 import com.nexauren.pdfmax.data.DocumentKind
 import com.nexauren.pdfmax.data.DocumentScanner
+import com.nexauren.pdfmax.data.DocumentActions
+import com.nexauren.pdfmax.data.PdfOperations
 import com.nexauren.pdfmax.data.IndexedDocument
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -149,7 +151,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                     }
                     Page.OFFICE -> OfficePreviewScreen(selectedFile, english) { go(Page.FILES) }
                     Page.TOOLS -> ToolsPage(english, { openTool(it) })
-                    Page.READER -> ReaderPage(english, pdfName, pdfUri, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
+                    Page.READER -> ReaderPage(english, pdfName, pdfUri, selectedFile, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
                     Page.CREATE_PDF -> PdfCreatorScreen(english)
                     Page.EDITOR -> ToolWorkspaceScreen(tools.first { it.title == "Editar PDF" }, english)
                     Page.CONVERTER -> ToolWorkspaceScreen(tools.first { it.title == "Converter PDF" }, english)
@@ -603,27 +605,118 @@ private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
 }
 
 @Composable
-private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> Unit, edit: () -> Unit, choose: (ToolSpec) -> Unit) {
+private fun ReaderPage(
+    en: Boolean,
+    fileName: String,
+    uri: Uri?,
+    file: File?,
+    openPdf: () -> Unit,
+    edit: () -> Unit,
+    choose: (ToolSpec) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var pageNumber by remember(uri) { mutableIntStateOf(1) }
-    var pageCount by remember(uri) { mutableIntStateOf(if (uri == null) 24 else 1) }
+    var pageCount by remember(uri) { mutableIntStateOf(1) }
+    var zoom by remember(uri) { mutableFloatStateOf(1f) }
+    var nightMode by remember(uri) { mutableStateOf(false) }
+    var showSearch by remember(uri) { mutableStateOf(false) }
+    var searchQuery by remember(uri) { mutableStateOf("") }
+    var searchReport by remember(uri) { mutableStateOf("") }
+    var searching by remember(uri) { mutableStateOf(false) }
+    var showProperties by remember(uri) { mutableStateOf(false) }
+    var propertiesText by remember(uri) { mutableStateOf("") }
+    var showMore by remember { mutableStateOf(false) }
+
+    val bookmarkKey = "bookmarks:" + (file?.absolutePath ?: uri?.toString() ?: fileName)
+    val readerPrefs = remember(context) { context.getSharedPreferences("pdfmax_reader", android.content.Context.MODE_PRIVATE) }
+    var bookmarks by remember(bookmarkKey) {
+        mutableStateOf(readerPrefs.getStringSet(bookmarkKey, emptySet()).orEmpty().toSet())
+    }
+    val currentPageKey = pageNumber.toString()
+    val isBookmarked = currentPageKey in bookmarks
+
+    fun toggleBookmark() {
+        val next = if (isBookmarked) bookmarks - currentPageKey else bookmarks + currentPageKey
+        bookmarks = next
+        readerPrefs.edit().putStringSet(bookmarkKey, next.toMutableSet()).apply()
+    }
+
+    fun showActionError(message: String) {
+        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    fun shareCurrent() {
+        val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
+        if (source == null || !source.isFile) {
+            showActionError(if (en) "This document cannot be shared from this reader session." else "Não foi possível partilhar este documento nesta sessão.")
+            return
+        }
+        runCatching { DocumentActions.share(context, source) }
+            .onFailure { showActionError(it.message ?: "Falha ao partilhar.") }
+    }
+
+    fun printCurrent() {
+        val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
+        if (source == null || !source.isFile) {
+            showActionError(if (en) "This document cannot be printed from this reader session." else "Não foi possível imprimir este documento nesta sessão.")
+            return
+        }
+        runCatching { DocumentActions.print(context, source) }
+            .onFailure { showActionError(it.message ?: "Falha ao imprimir.") }
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 15.dp, vertical = 7.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(if (uri == null) "Relatório_Final.pdf" else fileName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(if (en) "$pageNumber of $pageCount pages" else "$pageNumber de $pageCount páginas", color = MaxMuted, fontSize = 10.sp)
+                Text(fileName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (en) "$pageNumber of $pageCount pages" else "$pageNumber de $pageCount páginas",
+                    color = MaxMuted, fontSize = 10.sp
+                )
             }
             IconButton(onClick = openPdf) { Icon(Icons.Default.FolderOpen, null, tint = MaxCyan) }
-            IconButton(onClick = { pageNumber = 1 }) { Icon(Icons.Default.FirstPage, null, tint = MaxText) }
-            IconButton(onClick = { pageNumber = (pageNumber + 1).coerceAtMost(pageCount) }) { Icon(Icons.Default.ChevronRight, null, tint = MaxText) }
-            IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, null, tint = MaxText) }
+            Box {
+                IconButton(onClick = { showMore = true }) { Icon(Icons.Default.MoreVert, null, tint = MaxText) }
+                DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
+                    DropdownMenuItem(
+                        text = { Text(if (en) "Share PDF" else "Partilhar PDF") },
+                        leadingIcon = { Icon(Icons.Default.Share, null) },
+                        onClick = { showMore = false; shareCurrent() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (en) "Print PDF" else "Imprimir PDF") },
+                        leadingIcon = { Icon(Icons.Default.Print, null) },
+                        onClick = { showMore = false; printCurrent() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (en) "Document properties" else "Propriedades do documento") },
+                        leadingIcon = { Icon(Icons.Default.Info, null) },
+                        onClick = {
+                            showMore = false
+                            scope.launch {
+                                val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
+                                propertiesText = if (source != null && source.isFile) {
+                                    runCatching { withContext(Dispatchers.IO) { PdfOperations.getProperties(context, source) } }
+                                        .getOrElse { it.message ?: "Não foi possível ler as propriedades." }
+                                } else if (en) "Properties are unavailable for this document source." else "As propriedades não estão disponíveis para esta origem."
+                                showProperties = true
+                            }
+                        }
+                    )
+                }
+            }
         }
+
         PdfPagePreview(
             uri = uri,
             modifier = Modifier.padding(top = 3.dp),
             pageIndex = pageNumber - 1,
+            zoom = zoom,
+            nightMode = nightMode,
             onPageCount = { count ->
                 pageCount = count.coerceAtLeast(1)
-                pageNumber = pageNumber.coerceAtMost(pageCount)
+                pageNumber = pageNumber.coerceIn(1, pageCount)
             }
         )
         Spacer(Modifier.height(9.dp))
@@ -644,17 +737,57 @@ private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> 
         Spacer(Modifier.height(10.dp))
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(Color(0xFF112441))
-                .border(1.dp, Color(0xFF294D78), RoundedCornerShape(15.dp)).padding(vertical = 11.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .border(1.dp, Color(0xFF294D78), RoundedCornerShape(15.dp)).padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            ReaderAction(Icons.Default.ZoomIn, "Zoom")
-            ReaderAction(Icons.Default.Search, if (en) "Search" else "Pesquisar")
-            ReaderAction(Icons.Default.BookmarkBorder, if (en) "Bookmarks" else "Marcadores")
-            ReaderAction(Icons.Default.DarkMode, if (en) "Night" else "Noturno")
-            ReaderAction(Icons.Default.Share, if (en) "Share" else "Partilhar")
+            ReaderAction(Icons.Default.ZoomIn, "${(zoom * 100).toInt()}%", en) {
+                zoom = when {
+                    zoom < 1.2f -> 1.25f
+                    zoom < 1.45f -> 1.5f
+                    zoom < 1.8f -> 2f
+                    else -> 1f
+                }
+            }
+            ReaderAction(Icons.Default.Search, if (en) "Search" else "Pesquisar", en) {
+                searchQuery = ""
+                searchReport = ""
+                showSearch = true
+            }
+            ReaderAction(
+                if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                if (isBookmarked) { if (en) "Saved" else "Marcado" } else { if (en) "Bookmark" else "Marcador" },
+                en,
+                ::toggleBookmark
+            )
+            ReaderAction(
+                Icons.Default.DarkMode,
+                if (nightMode) { if (en) "Day" else "Dia" } else { if (en) "Night" else "Noite" },
+                en
+            ) { nightMode = !nightMode }
+            ReaderAction(Icons.Default.Share, if (en) "Share" else "Partilhar", en, ::shareCurrent)
+            ReaderAction(Icons.Default.Print, if (en) "Print" else "Imprimir", en, ::printCurrent)
         }
+
+        if (bookmarks.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            SectionTitle(if (en) "Bookmarks" else "Marcadores", bookmarks.size.toString()) {}
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                bookmarks.mapNotNull { it.toIntOrNull() }.sorted().forEach { bookmarkedPage ->
+                    ChoiceChip(
+                        (if (en) "Page " else "Página ") + bookmarkedPage,
+                        bookmarkedPage == pageNumber,
+                        { pageNumber = bookmarkedPage.coerceIn(1, pageCount) },
+                        MaxBlue
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.height(12.dp))
-        SectionTitle(if (en) "Pages" else "Páginas", if (en) "Organize" else "Organizar") { choose(tools.first { it.title == "Organizar páginas" }) }
+        SectionTitle(if (en) "Pages" else "Páginas", if (en) "Organize" else "Organizar") {
+            choose(tools.first { it.title == "Organizar páginas" })
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (1..pageCount.coerceAtMost(5)).forEach { n ->
                 Column(
@@ -680,14 +813,82 @@ private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> 
         }
         Spacer(Modifier.height(12.dp))
     }
+
+    if (showSearch) {
+        AlertDialog(
+            onDismissRequest = { showSearch = false },
+            title = { Text(if (en) "Search document text" else "Pesquisar texto no documento", color = Color.White) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        singleLine = true,
+                        label = { Text(if (en) "Text to find" else "Texto a encontrar") },
+                        colors = darkFieldColors()
+                    )
+                    if (searchReport.isNotBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(searchReport, color = MaxMuted, fontSize = 10.sp, lineHeight = 14.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !searching && searchQuery.isNotBlank(),
+                    onClick = {
+                        val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
+                        if (source == null || !source.isFile) {
+                            searchReport = if (en) "Text search is unavailable for this source." else "A pesquisa de texto não está disponível para esta origem."
+                        } else {
+                            scope.launch {
+                                searching = true
+                                searchReport = if (en) "Searching…" else "A pesquisar…"
+                                searchReport = runCatching {
+                                    val matches = withContext(Dispatchers.IO) {
+                                        PdfOperations.extractText(context, source)
+                                    }.lineSequence().filter { it.contains(searchQuery, ignoreCase = true) }.take(25).toList()
+                                    if (matches.isEmpty()) {
+                                        if (en) "No matching text was found." else "Não foi encontrado texto correspondente."
+                                    } else {
+                                        (if (en) "${matches.size} matching line(s):\n" else "${matches.size} linha(s) encontrada(s):\n") +
+                                            matches.joinToString("\n") { "• " + it.take(180) }
+                                    }
+                                }.getOrElse { it.message ?: (if (en) "Search failed." else "A pesquisa falhou.") }
+                                searching = false
+                            }
+                        }
+                    }
+                ) { Text(if (searching) { if (en) "Searching…" else "A pesquisar…" } else { if (en) "Search" else "Pesquisar" }, color = MaxCyan) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSearch = false }) { Text(if (en) "Close" else "Fechar", color = MaxMuted) }
+            },
+            containerColor = Color(0xFF102541)
+        )
+    }
+
+    if (showProperties) {
+        AlertDialog(
+            onDismissRequest = { showProperties = false },
+            title = { Text(if (en) "Document properties" else "Propriedades do documento", color = Color.White) },
+            text = { Text(propertiesText, color = MaxMuted, fontSize = 11.sp, lineHeight = 16.sp) },
+            confirmButton = { TextButton(onClick = { showProperties = false }) { Text(if (en) "Close" else "Fechar", color = MaxCyan) } },
+            containerColor = Color(0xFF102541)
+        )
+    }
 }
 
 @Composable
-private fun ReaderAction(icon: ImageVector, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(min = 43.dp)) {
+private fun ReaderAction(icon: ImageVector, label: String, english: Boolean, click: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(min = 43.dp).clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = click).padding(horizontal = 3.dp, vertical = 4.dp)
+    ) {
         Icon(icon, null, tint = Color(0xFFE4EEFF), modifier = Modifier.size(19.dp))
         Spacer(Modifier.height(4.dp))
-        Text(label, color = Color(0xFFD6E2F7), fontSize = 9.sp)
+        Text(label, color = Color(0xFFD6E2F7), fontSize = 9.sp, maxLines = 1)
     }
 }
 
