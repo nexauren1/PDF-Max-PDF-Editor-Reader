@@ -81,7 +81,7 @@ jobs:
           tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
           name: "PDF Max ${{ github.event.inputs.tag_name || github.ref_name }}"
           generate_release_notes: true
-          prerelease: true
+          prerelease: false
           files: |
             PDF-Max-$RELEASE_TAG.apk
             PDF-Max-$RELEASE_TAG.aab
