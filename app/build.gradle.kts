@@ -13,16 +13,7 @@ android {
         versionCode = 9
         versionName = "1.2.4"
     }
-    // Ship ABI-specific APKs instead of one universal APK containing every native library.
-    // Play will deliver only the device-matching split from the App Bundle.
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a")
-            isUniversalApk = false
-        }
-    }
+    // Android App Bundles are automatically split by device ABI by Google Play.
     buildFeatures { compose = true }
     val signingStorePath = System.getenv("ANDROID_KEYSTORE_PATH")
     val signingStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
