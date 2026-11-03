@@ -41,7 +41,7 @@ android {
     buildTypes {
         getByName("release") {
             // Production release builds are minified and resource-shrunk to reduce download size.
-            signingConfig = if (hasReleaseCredentials) signingConfigs.getByName("upload") else signingConfigs.getByName("debug")
+            // Never fall back to a debug key for a Release build. Missing upload credentials must fail the release task.\n            signingConfig = signingConfigs.getByName("upload")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
