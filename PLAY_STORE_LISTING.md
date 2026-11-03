@@ -39,7 +39,7 @@ PDF Max brings your PDF documents and everyday document tools together in one wo
 - Create structured PDFs with headings, paragraphs and tables.
 
 **On-device document handling**
-PDF Max processes supported document operations locally. Generated files are saved in the Documents/PDF Max folder. Translation downloads the language models it needs through Google Play services before translating on-device.
+PDF Max processes supported document operations locally. Generated files are saved in the Documents/PDF Max folder. The translation tool is powered by Google Translate through on-device ML Kit; it downloads the selected language models through Google Play services before translating on-device. Translations are automatic and should be reviewed. Learn more: https://translate.google.com.
 
 **Important feature notes**
 - PDF-to-Office export preserves selectable text; it does not promise to reproduce the original page layout, complex tables or embedded images.
@@ -87,7 +87,7 @@ O PDF Max reúne os seus documentos e ferramentas de produtividade num único es
 - Crie PDFs estruturados com títulos, parágrafos e tabelas.
 
 **Processamento no dispositivo**
-O PDF Max processa localmente as operações compatíveis. Os ficheiros gerados são guardados em Documentos/PDF Max. A tradução descarrega os modelos de idioma necessários através dos serviços Google Play e depois traduz no dispositivo.
+O PDF Max processa localmente as operações compatíveis. Os ficheiros gerados são guardados em Documentos/PDF Max. A ferramenta de tradução é fornecida pelo Google Tradutor através do ML Kit no dispositivo; descarrega os modelos de idioma selecionados através dos serviços Google Play e depois traduz localmente. As traduções são automáticas e devem ser revistas. Saiba mais: https://translate.google.com.
 
 **Notas importantes**
 - A exportação PDF para Office preserva texto selecionável, mas não garante a reprodução do layout original, tabelas complexas ou imagens incorporadas.
