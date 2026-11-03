@@ -778,12 +778,18 @@ private fun ReaderPage(
             SectionTitle(if (en) "Bookmarks" else "Marcadores", bookmarks.size.toString()) {}
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 bookmarks.mapNotNull { it.toIntOrNull() }.sorted().forEach { bookmarkedPage ->
-                    ChoiceChip(
-                        (if (en) "Page " else "Página ") + bookmarkedPage,
-                        bookmarkedPage == pageNumber,
-                        { pageNumber = bookmarkedPage.coerceIn(1, pageCount) },
-                        MaxBlue
-                    )
+                    Box(
+                        Modifier.clip(CircleShape)
+                            .background(if (bookmarkedPage == pageNumber) Color(0xFF164A75) else Color(0xFF172A47))
+                            .clickable { pageNumber = bookmarkedPage.coerceIn(1, pageCount) }
+                            .padding(horizontal = 13.dp, vertical = 9.dp)
+                    ) {
+                        Text(
+                            (if (en) "Page " else "Página ") + bookmarkedPage,
+                            color = Color.White, fontSize = 10.sp,
+                            fontWeight = if (bookmarkedPage == pageNumber) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
