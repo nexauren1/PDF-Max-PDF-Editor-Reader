@@ -15,7 +15,7 @@ class OfficeTextExtractorTest {
             ZipOutputStream(FileOutputStream(file)).use { zip ->
                 zip.putNextEntry(ZipEntry("word/document.xml"))
                 zip.write(
-                    """<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello</w:t><w:t> PDF Max</w:t></w:r></w:p></w:body></w:document>"""
+                    """<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Hello</w:t><w:t>PDF Max</w:t></w:r></w:p></w:body></w:document>"""
                         .toByteArray(Charsets.UTF_8)
                 )
                 zip.closeEntry()
