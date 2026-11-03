@@ -131,7 +131,7 @@ object AdvancedPdfOperations {
 
     /** Converts supported OOXML/text Office documents to text-based PDF locally. */
     fun officeToPdf(context: Context, input: File): File {
-        val supported = setOf("docx", "xlsx", "pptx", "txt", "csv", "rtf", "md", "log")
+        val supported = setOf("docx", "xlsx", "pptx", "txt", "csv", "md", "log")
         require(input.extension.lowercase(Locale.ROOT) in supported) {
             "Este formato Office antigo não pode ser convertido localmente. Guarde-o como DOCX, XLSX ou PPTX."
         }
