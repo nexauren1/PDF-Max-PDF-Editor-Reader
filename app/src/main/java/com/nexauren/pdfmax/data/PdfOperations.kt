@@ -80,7 +80,7 @@ object PdfOperations {
 
     fun split(context: Context, input: File, firstPage: Int, lastPage: Int): List<File> {
         init(context)
-        PDDocument.load(input).use { source ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { source ->
             require(firstPage >= 1 && lastPage >= firstPage && lastPage <= source.numberOfPages) {
                 "O intervalo deve estar entre 1 e " + source.numberOfPages + "."
             }
@@ -101,7 +101,7 @@ object PdfOperations {
         init(context)
         require(degrees in listOf(90, 180, 270))
         val target = output(input, "rotated")
-        PDDocument.load(input).use { doc ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { doc ->
             for (page in doc.pages) page.rotation = (page.rotation + degrees) % 360
             doc.save(target)
         }
@@ -112,7 +112,7 @@ object PdfOperations {
         init(context)
         require(text.isNotBlank() || numbering) { "Escreva o texto que deseja adicionar." }
         val target = output(input, if (watermark) "watermark" else if (numbering) "numbered" else "edited")
-        PDDocument.load(input).use { doc ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { doc ->
             val pageCount = doc.numberOfPages
             for (index in 0 until pageCount) {
                 val page = doc.getPage(index)
@@ -138,7 +138,7 @@ object PdfOperations {
         init(context)
         require(password.length >= 8) { "A senha deve ter pelo menos 8 caracteres." }
         val target = output(input, "protected")
-        PDDocument.load(input).use { doc ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { doc ->
             val ownerPassword = ByteArray(32).also { SecureRandom().nextBytes(it) }
                 .joinToString("") { "%02x".format(it.toInt() and 0xff) }
             val policy = StandardProtectionPolicy(ownerPassword, password, AccessPermission())
@@ -153,14 +153,14 @@ object PdfOperations {
     fun compress(context: Context, input: File): File {
         init(context)
         val target = output(input, "optimized")
-        PDDocument.load(input).use { it.save(target) }
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { it.save(target) }
         return target
     }
 
     fun repair(context: Context, input: File): File {
         init(context)
         val target = output(input, "repaired")
-        PDDocument.load(input).use { it.save(target) }
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { it.save(target) }
         return target
     }
 
@@ -211,16 +211,21 @@ object PdfOperations {
     fun extractImages(context: Context, input: File): List<File> {
         init(context)
         val results = mutableListOf<File>()
-        PDDocument.load(input).use { doc ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { doc ->
             for (pageIndex in 0 until doc.numberOfPages) {
                 val resources = doc.getPage(pageIndex).resources
                 for (name in resources.xObjectNames) {
                     val xObject = runCatching { resources.getXObject(name) }.getOrNull()
                     if (xObject is PDImageXObject) {
                         val bitmap = xObject.image
-                        val file = File(outputDirectory(), input.nameWithoutExtension + "_image_" + (pageIndex + 1) + "_" + (results.size + 1) + ".png")
-                        FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                        results.add(file)
+                        val file = output(input, "image_" + (pageIndex + 1) + "_" + (results.size + 1), "png")
+                        try {
+                            val written = FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                            check(written) { "Não foi possível guardar a imagem extraída." }
+                            results.add(file)
+                        } finally {
+                            bitmap.recycle()
+                        }
                     }
                 }
             }
@@ -230,7 +235,7 @@ object PdfOperations {
 
     fun extractText(context: Context, input: File): String {
         init(context)
-        return PDDocument.load(input).use { PDFTextStripper().getText(it) }
+        return PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { PDFTextStripper().getText(it) }
     }
 
     fun compare(context: Context, first: File, second: File): String {
@@ -262,7 +267,8 @@ object PdfOperations {
 
     fun createPdfFromText(context: Context, title: String, text: String): File {
         init(context)
-        val target = File(outputDirectory(), title.replace(Regex("[^A-Za-z0-9_-]"), "_") + "_PDF_Max.pdf")
+        val safeTitle = title.replace(Regex("[^A-Za-z0-9_-]"), "_").take(80).ifBlank { "Documento" }
+        val target = File(outputDirectory(), safeTitle + "_PDF_Max_" + System.currentTimeMillis() + "_" + System.nanoTime() + ".pdf")
         PDDocument().use { doc ->
             var page = PDPage(PDRectangle.A4)
             doc.addPage(page)
@@ -320,7 +326,7 @@ object PdfOperations {
 
     fun getProperties(context: Context, input: File): String {
         init(context)
-        return PDDocument.load(input).use { doc ->
+        return PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { doc ->
             val info = doc.documentInformation
             "Ficheiro: " + input.name + "\nPáginas: " + doc.numberOfPages +
                 "\nTamanho: " + input.length() + " bytes\nTítulo: " + (info.title ?: "—") +
@@ -344,7 +350,10 @@ object PdfOperations {
         }
     }
 
-    private fun xmlEscape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    private fun xmlEscape(value: String) = value.filter {
+        it == '\\t' || it == '\\n' || it == '\\r' ||
+            (it.code >= 0x20 && it.code != 0xFFFE && it.code != 0xFFFF)
+    }.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     private fun latin(value: String): String {
         val windows1252Extras = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ"
         return value.map { character ->
