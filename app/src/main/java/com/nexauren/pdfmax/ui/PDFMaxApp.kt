@@ -44,7 +44,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
-internal enum class Page { HOME, FILES, TOOLS, READER, OFFICE, CREATE_PDF, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
+internal enum class Page { HOME, FILES, FAVORITES, RECENT, TRASH, TOOLS, READER, OFFICE, CREATE_PDF, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
 internal data class ToolSpec(val title: String, val subtitle: String, val icon: ImageVector, val color: Color, val page: Page = Page.TOOL)
 
 private val tools = listOf(
@@ -106,6 +106,12 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
     val context = LocalContext.current
     fun go(target: Page) { screen = target; scope.launch { drawer.close() } }
     fun openTool(tool: ToolSpec) { currentTool = tool; screen = tool.page }
+    fun openLocalFile(file: File) {
+        selectedFile = file
+        pdfName = file.name
+        pdfUri = Uri.fromFile(file)
+        screen = if (file.extension.equals("pdf", true)) Page.READER else Page.OFFICE
+    }
 
     ModalNavigationDrawer(
         drawerState = drawer,
@@ -137,18 +143,11 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
             ) {
                 TopBar(screen, english, { scope.launch { drawer.open() } }, { go(Page.HOME) }, { go(Page.SETTINGS) })
                 when (screen) {
-                    Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { go(Page.FILES) }) { file ->
-    selectedFile = file
-    pdfName = file.name
-    pdfUri = Uri.fromFile(file)
-    screen = if (file.extension.equals("pdf", true)) Page.READER else Page.OFFICE
-}
-                    Page.FILES -> DocumentLibraryScreen(english) { file ->
-                        selectedFile = file
-                        pdfName = file.name
-                        pdfUri = Uri.fromFile(file)
-                        screen = if (file.extension.equals("pdf", true)) Page.READER else Page.OFFICE
-                    }
+                    Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { go(Page.FILES) }, ::openLocalFile)
+                    Page.FILES -> DocumentLibraryScreen(english, ::openLocalFile)
+                    Page.FAVORITES -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Favorites")
+                    Page.RECENT -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Recent")
+                    Page.TRASH -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Trash")
                     Page.OFFICE -> OfficePreviewScreen(selectedFile, english) { go(Page.FILES) }
                     Page.TOOLS -> ToolsPage(english, { openTool(it) })
                     Page.READER -> ReaderPage(english, pdfName, pdfUri, selectedFile, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
@@ -1179,9 +1178,9 @@ private fun SideMenu(current: Page, en: Boolean, navigate: (Page) -> Unit, langu
         DrawerItem(Icons.Default.Home, if (en) "Home" else "Início", current == Page.HOME) { navigate(Page.HOME) }
         DrawerItem(Icons.Default.FolderOpen, if (en) "My files" else "Meus Arquivos", current == Page.FILES) { navigate(Page.FILES) }
         DrawerItem(Icons.Default.GridView, if (en) "Tools" else "Ferramentas", current == Page.TOOLS) { navigate(Page.TOOLS) }
-        DrawerItem(Icons.Default.Star, if (en) "Favorites" else "Favoritos", false) { navigate(Page.FILES) }
-        DrawerItem(Icons.Default.History, if (en) "Recent" else "Recentes", false) { navigate(Page.FILES) }
-        DrawerItem(Icons.Default.Delete, if (en) "Trash" else "Lixeira", false) { navigate(Page.FILES) }
+        DrawerItem(Icons.Default.Star, if (en) "Favorites" else "Favoritos", current == Page.FAVORITES) { navigate(Page.FAVORITES) }
+        DrawerItem(Icons.Default.History, if (en) "Recent" else "Recentes", current == Page.RECENT) { navigate(Page.RECENT) }
+        DrawerItem(Icons.Default.Delete, if (en) "Trash" else "Lixeira", current == Page.TRASH) { navigate(Page.TRASH) }
         Spacer(Modifier.height(17.dp))
         Text(if (en) "PREFERENCES" else "PREFERÊNCIAS", color = Color(0xFF7186A5), fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp, bottom = 7.dp))
         DrawerItem(Icons.Default.Settings, if (en) "Settings" else "Configurações", current == Page.SETTINGS) { navigate(Page.SETTINGS) }
