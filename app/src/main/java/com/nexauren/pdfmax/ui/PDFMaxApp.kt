@@ -503,6 +503,8 @@ private fun FilesPage(en: Boolean, fileName: String, openPdf: () -> Unit, openRe
 
 private fun toolCategory(title: String): String = when (title) {
     "Editar PDF", "Adicionar texto", "Marca de água", "Assinar PDF", "Preencher formulários", "Editar metadados" -> "Edit"
+    "Achatar formulários", "Remover metadados" -> "Security"
+    "Relatório do PDF" -> "Utilities"
     "Juntar PDF", "Dividir PDF", "Organizar páginas", "Remover páginas", "Extrair páginas",
     "Adicionar página em branco", "Rodar páginas" -> "Organize"
     "Converter PDF", "PDF para imagem", "Imagem para PDF", "Extrair imagens", "Extrair texto PDF", "Criar PDF" -> "Convert"
@@ -1360,6 +1362,8 @@ internal fun localizedToolTitle(title: String, english: Boolean): String {
         "Remover páginas" -> "Delete pages"; "Extrair texto PDF" -> "Extract PDF text"; "Criar ZIP" -> "Create ZIP"
         "Detetar duplicados" -> "Find duplicates"; "Extrair páginas" -> "Extract pages"
         "Adicionar página em branco" -> "Add blank page"; "Editar metadados" -> "Edit metadata"
+        "Achatar formulários" -> "Flatten forms"; "Remover metadados" -> "Remove metadata"
+        "Relatório do PDF" -> "PDF report"
         else -> title
     }
 }
@@ -1382,6 +1386,9 @@ internal fun localizedToolSubtitle(title: String, english: Boolean): String {
         "Criar ZIP" -> "Archive multiple files"; "Detetar duplicados" -> "Find exact copies"
         "Extrair páginas" -> "Create a PDF from selected pages"; "Adicionar página em branco" -> "Insert a new page"
         "Editar metadados" -> "Title, author and keywords"
+        "Achatar formulários" -> "Make existing form fields read-only page content"
+        "Remover metadados" -> "Clear standard document info and catalog XMP metadata"
+        "Relatório do PDF" -> "Pages, word count and extractable text"
         else -> tools.firstOrNull { it.title == title }?.subtitle.orEmpty()
     }
 }
