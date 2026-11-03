@@ -27,7 +27,8 @@ Policy reference: https://support.google.com/googleplay/android-developer/answer
 
 ## Store listing and privacy
 - [ ] Publish [PRIVACY_POLICY.md](PRIVACY_POLICY.md) at a stable public HTTPS URL and enter that URL in Play Console.
-- [ ] Complete the Data safety form to match the final SDKs and actual app behaviour.
+- [ ] Complete the Data safety form to match the final SDKs and actual app behaviour. ML Kit documents collection of device/app information, per-installation or device identifiers, performance metrics, API configuration, feature input/output sizes, feature version, event types and error codes for diagnostics and usage analytics; review the linked SDK disclosure before selecting Play Console data types: https://developers.google.com/ml-kit/android-data-disclosure.
+- [ ] Include Google Play services/model-download behaviour and relevant third-party SDK disclosures; the fact that OCR/translation content is processed on-device does not mean ML Kit sends no telemetry.
 - [ ] Complete content rating, target audience, ads declaration and app category.
 - [ ] Provide the 512×512 store icon, feature graphic, phone screenshots and short/full descriptions in Portuguese and English.
 - [ ] Test onboarding, all-files permission, scanning, PDF creation, import/open, sharing, printing, translation, favourites, recent files, reversible trash, bookmarks, text search, zoom and night mode on at least one Android 13 device and one Android 15/16 device.
