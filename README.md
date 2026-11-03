@@ -64,7 +64,9 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 
 - Android Gradle Plugin 8.10.1, Gradle 8.11.1 and JDK 17.
 - Compile SDK 36 and target SDK 36 (Android 16); minimum Android 8.0 (API 26).
-- GitHub Actions builds Debug APKs, a privately signed universal Release APK for direct device testing, and a signed Android App Bundle (AAB).
+- GitHub Actions runs unit tests, builds Debug APKs, a privately signed universal Release APK for direct device testing, and a signed Android App Bundle (AAB).
+- Release CI verifies the APK signature, package ID, version metadata and AAB signature before publishing artifacts.
+- PDF processing uses disk-backed PDFBox scratch storage for memory-intensive operations; image-to-PDF decodes images at a bounded resolution to reduce RAM spikes.
 - Release builds use R8 code shrinking and resource shrinking. CI prints APK/AAB sizes. Google Play should receive the AAB; Google Play generates device-specific APK splits automatically.
 - Release jobs validate the private upload keystore, password and alias before building. They fail instead of publishing a debug-signed production package.
 - The next stable GitHub release is tagged `v1.2.5`; upload the AAB to Google Play, not the debug APK.
