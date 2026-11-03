@@ -147,7 +147,19 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         } else permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
+    suspend fun discardPendingResults(files: List<File>) {
+        withContext(Dispatchers.IO) {
+            files.mapNotNull { it.parentFile }
+                .distinctBy { it.absolutePath }
+                .filter { it.name.startsWith("pdfmax_pending_") }
+                .forEach { directory ->
+                    runCatching { directory.deleteRecursively() }
+                }
+        }
+    }
+
     LaunchedEffect(tool.title) {
+        discardPendingResults(resultFiles)
         selectedPath = null
         selectedPaths = emptySet()
         query = ""
@@ -639,6 +651,8 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
             Spacer(Modifier.height(10.dp))
             OutlinedButton(
                 onClick = {
+                    val pendingToDiscard = resultFiles.toList()
+                    scope.launch { discardPendingResults(pendingToDiscard) }
                     flowStage = ToolFlowStage.SELECT
                     outputMessage = null
                     resultFiles = emptyList()
