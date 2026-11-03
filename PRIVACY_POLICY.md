@@ -1,6 +1,6 @@
 # PDF Max – Privacy Policy
 
-**Last updated: 31 October 2026**
+**Last updated: 3 November 2026**
 
 PDF Max is an Android PDF reader and document-management/editor application. This policy explains how the app accesses and handles information on your device.
 
@@ -8,7 +8,7 @@ PDF Max is an Android PDF reader and document-management/editor application. Thi
 
 PDF Max uses Android's **All files access** permission (`MANAGE_EXTERNAL_STORAGE`) to find supported documents in shared device storage, display its internal document library, and let you run document operations without selecting every source file in a separate file-picker app. The app reads and writes files only as needed for the document features you choose. Original documents are not automatically deleted.
 
-Generated files are saved in **Documents/PDF Max**. The library index (file names, paths, sizes and modification times) is stored in the app's private preferences so the library can be restored between sessions. This index is not a cloud backup. You can clear the app's data or uninstall PDF Max to remove its private index and preferences; files saved in shared Documents storage remain until you delete them.
+Generated files are saved in **Documents/PDF Max**. The library index (file names, paths, sizes and modification times), favourites, recently opened paths, reversible in-app trash entries and reader bookmarks are stored in the app's private preferences so the library can be restored between sessions. The in-app trash only hides an entry inside PDF Max; it does not delete or move the source document. This information is not a cloud backup. You can clear the app's data or uninstall PDF Max to remove its private index and preferences; files saved in shared Documents storage remain until you delete them.
 
 ## Camera and OCR
 
@@ -16,7 +16,7 @@ The camera permission is used only when you choose the in-app document capture f
 
 ## Translation
 
-When you choose PDF translation, PDF Max uses Google ML Kit's on-device translation models. The first use of a language pair downloads the required language models through Google Play services; translated document text is processed on the device. Scanned PDFs need OCR before text can be translated.
+When you choose PDF translation, PDF Max uses Google Translate through Google ML Kit's on-device translation models. The first use of a language pair downloads the required language models through Google Play services; translated document text is processed on the device. Scanned PDFs need OCR before text can be translated. Translations are automatic and can be inaccurate; review important content. Learn more at https://translate.google.com.
 
 ## Sharing and printing
 
@@ -26,9 +26,15 @@ Sharing or printing starts only after you choose the corresponding action. Andro
 
 The Internet permission is used for required model downloads and related Google Play services communication. The current app build does not include a developer-operated account system, advertising SDK, analytics SDK or document-upload service. PDF Max does not send document contents to servers operated by the developer.
 
+## ML Kit diagnostics and usage metrics
+
+PDF Max uses Google ML Kit for on-device text recognition and translation. The document text, scan images and translated output are processed on the device and are not sent to Google servers as part of the ML Kit processing itself. However, Google states that its ML Kit Android SDKs collect technical information for diagnostics and usage analytics. This can include device manufacturer/model and Android version, app package/version, per-installation or device identifiers, performance and latency metrics, API configuration, feature input/output size, feature version, event types and error codes. Google says these metrics are encrypted in transit and are not shared with third parties. See Google's [ML Kit Android data disclosure](https://developers.google.com/ml-kit/android-data-disclosure) and [ML Kit terms and privacy](https://developers.google.com/ml-kit/terms).
+
+The first use of on-device translation may also download language models through Google Play services. Google Play services and ML Kit may process technical download and diagnostic information under Google's terms and privacy policy.
+
 ## Information collected by the developer
 
-The current app build does not ask you to create an account and does not collect your name, email address, precise location or contacts. The developer does not receive the private file index stored on your device.
+The current app build does not ask you to create an account and the developer does not receive your name, email address, precise location, contacts, private file index, favourites, recent-file list, in-app trash list or reader bookmarks. This statement does not exclude the third-party ML Kit diagnostics described above; account for those SDK transmissions in the Google Play Data safety form.
 
 ## Data security and control
 

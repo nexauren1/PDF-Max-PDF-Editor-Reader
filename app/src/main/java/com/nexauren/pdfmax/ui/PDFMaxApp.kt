@@ -5,6 +5,13 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import java.io.File
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,13 +43,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nexauren.pdfmax.ui.theme.*
 import com.nexauren.pdfmax.data.DocumentKind
 import com.nexauren.pdfmax.data.DocumentScanner
+import com.nexauren.pdfmax.data.DocumentActions
+import com.nexauren.pdfmax.data.PdfOperations
 import com.nexauren.pdfmax.data.IndexedDocument
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
-internal enum class Page { HOME, FILES, TOOLS, READER, OFFICE, CREATE_PDF, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
+internal enum class Page { HOME, FILES, FAVORITES, RECENT, TRASH, TOOLS, READER, OFFICE, CREATE_PDF, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
 internal data class ToolSpec(val title: String, val subtitle: String, val icon: ImageVector, val color: Color, val page: Page = Page.TOOL)
 
 private val tools = listOf(
@@ -76,7 +85,10 @@ private val tools = listOf(
     ToolSpec("Detetar duplicados", "Encontrar cópias exatas", Icons.Default.ContentCopy, Color(0xFF9B6BFF)),
     ToolSpec("Extrair páginas", "Criar um PDF com páginas escolhidas", Icons.Default.Description, Color(0xFF398BFF)),
     ToolSpec("Adicionar página em branco", "Inserir uma nova página", Icons.Default.NoteAdd, Color(0xFF16B89B)),
-    ToolSpec("Editar metadados", "Título, autor e palavras-chave", Icons.Default.EditNote, Color(0xFFFF8A45))
+    ToolSpec("Editar metadados", "Título, autor e palavras-chave", Icons.Default.EditNote, Color(0xFFFF8A45)),
+    ToolSpec("Achatar formulários", "Transformar campos AcroForm em conteúdo fixo", Icons.Default.Layers, Color(0xFF17AFA0)),
+    ToolSpec("Remover metadados", "Limpar autor, título, datas e XMP do documento", Icons.Default.PrivacyTip, Color(0xFFE66A83)),
+    ToolSpec("Relatório do PDF", "Contagem de páginas, palavras e texto extraível", Icons.Default.Analytics, Color(0xFF5A91F3))
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,6 +116,17 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
     val context = LocalContext.current
     fun go(target: Page) { screen = target; scope.launch { drawer.close() } }
     fun openTool(tool: ToolSpec) { currentTool = tool; screen = tool.page }
+    fun openLocalFile(file: File) {
+        val libraryPrefs = appContext.getSharedPreferences("pdfmax_library", android.content.Context.MODE_PRIVATE)
+        val path = file.absolutePath
+        val recent = libraryPrefs.getString("recent_paths", "").orEmpty()
+            .split("\n").filter { it.isNotBlank() && it != path }
+        libraryPrefs.edit().putString("recent_paths", (listOf(path) + recent).take(50).joinToString("\n")).apply()
+        selectedFile = file
+        pdfName = file.name
+        pdfUri = Uri.fromFile(file)
+        screen = if (file.extension.equals("pdf", true)) Page.READER else Page.OFFICE
+    }
 
     ModalNavigationDrawer(
         drawerState = drawer,
@@ -124,7 +147,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                 BottomBar(
                     Modifier.fillMaxWidth(), screen, english,
                     { go(Page.HOME) }, { go(Page.FILES) },
-                    { go(Page.FILES) },
+                    { go(Page.CREATE_PDF) },
                     { go(Page.TOOLS) }, { scope.launch { drawer.open() } }
                 )
             }
@@ -133,30 +156,35 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                 Modifier.fillMaxSize().padding(insets)
                     .background(Brush.verticalGradient(listOf(Color(0xFF071329), Color(0xFF08162B), Color(0xFF050E20))))
             ) {
-                TopBar(screen, english, { scope.launch { drawer.open() } }, { go(Page.HOME) }, { go(Page.SETTINGS) })
-                when (screen) {
-                    Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { go(Page.FILES) }) { file ->
-    selectedFile = file
-    pdfName = file.name
-    pdfUri = Uri.fromFile(file)
-    screen = if (file.extension.equals("pdf", true)) Page.READER else Page.OFFICE
-}
-                    Page.FILES -> DocumentLibraryScreen(english) { file ->
-                        selectedFile = file
-                        pdfName = file.name
-                        pdfUri = Uri.fromFile(file)
-                        screen = if (file.extension.equals("pdf", true)) Page.READER else Page.OFFICE
+                AnimatedContent(
+                    targetState = screen to (if (screen == Page.TOOL) currentTool else tools.first()),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(220)) +
+                            slideInHorizontally(animationSpec = tween(220)) { width -> width / 18 }) togetherWith
+                            (fadeOut(animationSpec = tween(160)) +
+                                slideOutHorizontally(animationSpec = tween(160)) { width -> -width / 24 })
+                    },
+                    label = "PDF Max screen transition"
+                ) { destination ->
+                    val (targetPage, targetTool) = destination
+                    when (targetPage) {
+                        Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { go(Page.FILES) }, ::openLocalFile)
+                        Page.FILES -> DocumentLibraryScreen(english, ::openLocalFile)
+                        Page.FAVORITES -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Favorites")
+                        Page.RECENT -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Recent")
+                        Page.TRASH -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Trash")
+                        Page.OFFICE -> OfficePreviewScreen(selectedFile, english) { go(Page.FILES) }
+                        Page.TOOLS -> ToolsPage(english, { openTool(it) })
+                        Page.READER -> ReaderPage(english, pdfName, pdfUri, selectedFile, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
+                        Page.CREATE_PDF -> PdfCreatorScreen(english)
+                        Page.EDITOR -> ToolWorkspaceScreen(tools.first { it.title == "Editar PDF" }, english)
+                        Page.CONVERTER -> ToolWorkspaceScreen(tools.first { it.title == "Converter PDF" }, english)
+                        Page.SCANNER -> ToolWorkspaceScreen(tools.first { it.title == "Digitalizar e OCR" }, english)
+                        Page.PROTECT -> ToolWorkspaceScreen(tools.first { it.title == "Proteger PDF" }, english)
+                        Page.SETTINGS -> SettingsPage(english, { toggleLanguage() })
+                        Page.TOOL -> ToolWorkspaceScreen(targetTool, english)
                     }
-                    Page.OFFICE -> OfficePreviewScreen(selectedFile, english) { go(Page.FILES) }
-                    Page.TOOLS -> ToolsPage(english, { openTool(it) })
-                    Page.READER -> ReaderPage(english, pdfName, pdfUri, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
-                    Page.CREATE_PDF -> PdfCreatorScreen(english)
-                    Page.EDITOR -> ToolWorkspaceScreen(tools.first { it.title == "Editar PDF" }, english)
-                    Page.CONVERTER -> ToolWorkspaceScreen(tools.first { it.title == "Converter PDF" }, english)
-                    Page.SCANNER -> ToolWorkspaceScreen(tools.first { it.title == "Digitalizar e OCR" }, english)
-                    Page.PROTECT -> ToolWorkspaceScreen(tools.first { it.title == "Proteger PDF" }, english)
-                    Page.SETTINGS -> SettingsPage(english, { toggleLanguage() })
-                    Page.TOOL -> ToolWorkspaceScreen(currentTool, english)
                 }
             }
         }
@@ -180,7 +208,6 @@ private fun TopBar(screen: Page, english: Boolean, onMenu: () -> Unit, onBack: (
             Text(if (english) "PDF Editor & Reader" else "Editor e Leitor de PDF", fontSize = 10.sp, color = MaxMuted)
         }
         IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, null, tint = Color(0xFFC1D2EE)) }
-        IconButton(onClick = {}) { Icon(Icons.Default.NotificationsNone, null, tint = Color(0xFFC1D2EE)) }
     }
 }
 
@@ -360,11 +387,18 @@ private fun SectionTitle(title: String, action: String, onAction: () -> Unit) {
 
 @Composable
 private fun ToolGrid(list: List<ToolSpec>, onChoose: (ToolSpec) -> Unit, english: Boolean = false) {
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        list.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                row.forEach { ToolTile(it, Modifier.weight(1f), english) { onChoose(it) } }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+    // Wider cards make the tool catalogue easier to scan and leave room for
+    // each tool's real purpose, matching the dedicated-workspace design.
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        list.chunked(2).forEach { row ->
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                row.forEach { tool ->
+                    ToolTile(tool, Modifier.weight(1f), english) { onChoose(tool) }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
@@ -372,18 +406,39 @@ private fun ToolGrid(list: List<ToolSpec>, onChoose: (ToolSpec) -> Unit, english
 
 @Composable
 private fun ToolTile(tool: ToolSpec, modifier: Modifier = Modifier, english: Boolean = false, click: () -> Unit) {
-    Column(
-        modifier.height(92.dp).clip(RoundedCornerShape(15.dp))
-            .background(Brush.linearGradient(listOf(tool.color.copy(alpha = 0.25f), Color(0xFF0D1B33), Color(0xFF101A31))))
-            .border(1.dp, tool.color.copy(alpha = 0.48f), RoundedCornerShape(15.dp))
-            .clickable(onClick = click).padding(horizontal = 6.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
+    Row(
+        modifier.heightIn(min = 96.dp).clip(RoundedCornerShape(16.dp))
+            .background(Brush.linearGradient(listOf(tool.color.copy(alpha = 0.24f), Color(0xFF0D1B33), Color(0xFF101A31))))
+            .border(1.dp, tool.color.copy(alpha = 0.52f), RoundedCornerShape(16.dp))
+            .clickable(onClick = click).padding(horizontal = 10.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(37.dp).clip(RoundedCornerShape(11.dp)).background(Brush.linearGradient(listOf(tool.color, tool.color.copy(alpha = 0.65f)))), contentAlignment = Alignment.Center) {
-            Icon(tool.icon, null, tint = Color.White, modifier = Modifier.size(21.dp))
+        Box(
+            Modifier.size(42.dp).clip(RoundedCornerShape(12.dp))
+                .background(Brush.linearGradient(listOf(tool.color, tool.color.copy(alpha = 0.62f)))),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(tool.icon, null, tint = Color.White, modifier = Modifier.size(23.dp))
         }
-        Spacer(Modifier.height(6.dp))
-        Text(localizedToolTitle(tool.title, english), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Text(
+                localizedToolTitle(tool.title, english),
+                color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                localizedToolSubtitle(tool.title, english),
+                color = MaxMuted, fontSize = 9.sp, lineHeight = 11.sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis
+            )
+        }
+        Spacer(Modifier.width(3.dp))
+        Icon(
+            Icons.Default.ChevronRight, null, tint = tool.color,
+            modifier = Modifier.size(17.dp)
+        )
     }
 }
 
@@ -447,6 +502,8 @@ private fun FilesPage(en: Boolean, fileName: String, openPdf: () -> Unit, openRe
 
 private fun toolCategory(title: String): String = when (title) {
     "Editar PDF", "Adicionar texto", "Marca de água", "Assinar PDF", "Preencher formulários", "Editar metadados" -> "Edit"
+    "Achatar formulários", "Remover metadados" -> "Security"
+    "Relatório do PDF" -> "Utilities"
     "Juntar PDF", "Dividir PDF", "Organizar páginas", "Remover páginas", "Extrair páginas",
     "Adicionar página em branco", "Rodar páginas" -> "Organize"
     "Converter PDF", "PDF para imagem", "Imagem para PDF", "Extrair imagens", "Extrair texto PDF", "Criar PDF" -> "Convert"
@@ -575,27 +632,118 @@ private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
 }
 
 @Composable
-private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> Unit, edit: () -> Unit, choose: (ToolSpec) -> Unit) {
+private fun ReaderPage(
+    en: Boolean,
+    fileName: String,
+    uri: Uri?,
+    file: File?,
+    openPdf: () -> Unit,
+    edit: () -> Unit,
+    choose: (ToolSpec) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var pageNumber by remember(uri) { mutableIntStateOf(1) }
-    var pageCount by remember(uri) { mutableIntStateOf(if (uri == null) 24 else 1) }
+    var pageCount by remember(uri) { mutableIntStateOf(1) }
+    var zoom by remember(uri) { mutableFloatStateOf(1f) }
+    var nightMode by remember(uri) { mutableStateOf(false) }
+    var showSearch by remember(uri) { mutableStateOf(false) }
+    var searchQuery by remember(uri) { mutableStateOf("") }
+    var searchReport by remember(uri) { mutableStateOf("") }
+    var searching by remember(uri) { mutableStateOf(false) }
+    var showProperties by remember(uri) { mutableStateOf(false) }
+    var propertiesText by remember(uri) { mutableStateOf("") }
+    var showMore by remember { mutableStateOf(false) }
+
+    val bookmarkKey = "bookmarks:" + (file?.absolutePath ?: uri?.toString() ?: fileName)
+    val readerPrefs = remember(context) { context.getSharedPreferences("pdfmax_reader", android.content.Context.MODE_PRIVATE) }
+    var bookmarks by remember(bookmarkKey) {
+        mutableStateOf(readerPrefs.getStringSet(bookmarkKey, emptySet()).orEmpty().toSet())
+    }
+    val currentPageKey = pageNumber.toString()
+    val isBookmarked = currentPageKey in bookmarks
+
+    fun toggleBookmark() {
+        val next = if (isBookmarked) bookmarks - currentPageKey else bookmarks + currentPageKey
+        bookmarks = next
+        readerPrefs.edit().putStringSet(bookmarkKey, next.toMutableSet()).apply()
+    }
+
+    fun showActionError(message: String) {
+        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    fun shareCurrent() {
+        val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
+        if (source == null || !source.isFile) {
+            showActionError(if (en) "This document cannot be shared from this reader session." else "Não foi possível partilhar este documento nesta sessão.")
+            return
+        }
+        runCatching { DocumentActions.share(context, source) }
+            .onFailure { showActionError(it.message ?: "Falha ao partilhar.") }
+    }
+
+    fun printCurrent() {
+        val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
+        if (source == null || !source.isFile) {
+            showActionError(if (en) "This document cannot be printed from this reader session." else "Não foi possível imprimir este documento nesta sessão.")
+            return
+        }
+        runCatching { DocumentActions.print(context, source) }
+            .onFailure { showActionError(it.message ?: "Falha ao imprimir.") }
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 15.dp, vertical = 7.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(if (uri == null) "Relatório_Final.pdf" else fileName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(if (en) "$pageNumber of $pageCount pages" else "$pageNumber de $pageCount páginas", color = MaxMuted, fontSize = 10.sp)
+                Text(fileName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (en) "$pageNumber of $pageCount pages" else "$pageNumber de $pageCount páginas",
+                    color = MaxMuted, fontSize = 10.sp
+                )
             }
             IconButton(onClick = openPdf) { Icon(Icons.Default.FolderOpen, null, tint = MaxCyan) }
-            IconButton(onClick = { pageNumber = 1 }) { Icon(Icons.Default.FirstPage, null, tint = MaxText) }
-            IconButton(onClick = { pageNumber = (pageNumber + 1).coerceAtMost(pageCount) }) { Icon(Icons.Default.ChevronRight, null, tint = MaxText) }
-            IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, null, tint = MaxText) }
+            Box {
+                IconButton(onClick = { showMore = true }) { Icon(Icons.Default.MoreVert, null, tint = MaxText) }
+                DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
+                    DropdownMenuItem(
+                        text = { Text(if (en) "Share PDF" else "Partilhar PDF") },
+                        leadingIcon = { Icon(Icons.Default.Share, null) },
+                        onClick = { showMore = false; shareCurrent() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (en) "Print PDF" else "Imprimir PDF") },
+                        leadingIcon = { Icon(Icons.Default.Print, null) },
+                        onClick = { showMore = false; printCurrent() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (en) "Document properties" else "Propriedades do documento") },
+                        leadingIcon = { Icon(Icons.Default.Info, null) },
+                        onClick = {
+                            showMore = false
+                            scope.launch {
+                                val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
+                                propertiesText = if (source != null && source.isFile) {
+                                    runCatching { withContext(Dispatchers.IO) { PdfOperations.getProperties(context, source) } }
+                                        .getOrElse { it.message ?: "Não foi possível ler as propriedades." }
+                                } else if (en) "Properties are unavailable for this document source." else "As propriedades não estão disponíveis para esta origem."
+                                showProperties = true
+                            }
+                        }
+                    )
+                }
+            }
         }
+
         PdfPagePreview(
             uri = uri,
             modifier = Modifier.padding(top = 3.dp),
             pageIndex = pageNumber - 1,
+            zoom = zoom,
+            nightMode = nightMode,
             onPageCount = { count ->
                 pageCount = count.coerceAtLeast(1)
-                pageNumber = pageNumber.coerceAtMost(pageCount)
+                pageNumber = pageNumber.coerceIn(1, pageCount)
             }
         )
         Spacer(Modifier.height(9.dp))
@@ -616,17 +764,63 @@ private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> 
         Spacer(Modifier.height(10.dp))
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(Color(0xFF112441))
-                .border(1.dp, Color(0xFF294D78), RoundedCornerShape(15.dp)).padding(vertical = 11.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .border(1.dp, Color(0xFF294D78), RoundedCornerShape(15.dp)).padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            ReaderAction(Icons.Default.ZoomIn, "Zoom")
-            ReaderAction(Icons.Default.Search, if (en) "Search" else "Pesquisar")
-            ReaderAction(Icons.Default.BookmarkBorder, if (en) "Bookmarks" else "Marcadores")
-            ReaderAction(Icons.Default.DarkMode, if (en) "Night" else "Noturno")
-            ReaderAction(Icons.Default.Share, if (en) "Share" else "Partilhar")
+            ReaderAction(Icons.Default.ZoomIn, "${(zoom * 100).toInt()}%", en) {
+                zoom = when {
+                    zoom < 1.2f -> 1.25f
+                    zoom < 1.45f -> 1.5f
+                    zoom < 1.8f -> 2f
+                    else -> 1f
+                }
+            }
+            ReaderAction(Icons.Default.Search, if (en) "Search" else "Pesquisar", en) {
+                searchQuery = ""
+                searchReport = ""
+                showSearch = true
+            }
+            ReaderAction(
+                if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                if (isBookmarked) { if (en) "Saved" else "Marcado" } else { if (en) "Bookmark" else "Marcador" },
+                en,
+                ::toggleBookmark
+            )
+            ReaderAction(
+                Icons.Default.DarkMode,
+                if (nightMode) { if (en) "Day" else "Dia" } else { if (en) "Night" else "Noite" },
+                en
+            ) { nightMode = !nightMode }
+            ReaderAction(Icons.Default.Share, if (en) "Share" else "Partilhar", en, ::shareCurrent)
+            ReaderAction(Icons.Default.Print, if (en) "Print" else "Imprimir", en, ::printCurrent)
         }
+
+        if (bookmarks.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            SectionTitle(if (en) "Bookmarks" else "Marcadores", bookmarks.size.toString()) {}
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                bookmarks.mapNotNull { it.toIntOrNull() }.sorted().forEach { bookmarkedPage ->
+                    Box(
+                        Modifier.clip(CircleShape)
+                            .background(if (bookmarkedPage == pageNumber) Color(0xFF164A75) else Color(0xFF172A47))
+                            .clickable { pageNumber = bookmarkedPage.coerceIn(1, pageCount) }
+                            .padding(horizontal = 13.dp, vertical = 9.dp)
+                    ) {
+                        Text(
+                            (if (en) "Page " else "Página ") + bookmarkedPage,
+                            color = Color.White, fontSize = 10.sp,
+                            fontWeight = if (bookmarkedPage == pageNumber) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+
         Spacer(Modifier.height(12.dp))
-        SectionTitle(if (en) "Pages" else "Páginas", if (en) "Organize" else "Organizar") { choose(tools.first { it.title == "Organizar páginas" }) }
+        SectionTitle(if (en) "Pages" else "Páginas", if (en) "Organize" else "Organizar") {
+            choose(tools.first { it.title == "Organizar páginas" })
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (1..pageCount.coerceAtMost(5)).forEach { n ->
                 Column(
@@ -652,14 +846,82 @@ private fun ReaderPage(en: Boolean, fileName: String, uri: Uri?, openPdf: () -> 
         }
         Spacer(Modifier.height(12.dp))
     }
+
+    if (showSearch) {
+        AlertDialog(
+            onDismissRequest = { showSearch = false },
+            title = { Text(if (en) "Search document text" else "Pesquisar texto no documento", color = Color.White) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        singleLine = true,
+                        label = { Text(if (en) "Text to find" else "Texto a encontrar") },
+                        colors = darkFieldColors()
+                    )
+                    if (searchReport.isNotBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(searchReport, color = MaxMuted, fontSize = 10.sp, lineHeight = 14.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !searching && searchQuery.isNotBlank(),
+                    onClick = {
+                        val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
+                        if (source == null || !source.isFile) {
+                            searchReport = if (en) "Text search is unavailable for this source." else "A pesquisa de texto não está disponível para esta origem."
+                        } else {
+                            scope.launch {
+                                searching = true
+                                searchReport = if (en) "Searching…" else "A pesquisar…"
+                                searchReport = runCatching {
+                                    val matches = withContext(Dispatchers.IO) {
+                                        PdfOperations.extractText(context, source)
+                                    }.lineSequence().filter { it.contains(searchQuery, ignoreCase = true) }.take(25).toList()
+                                    if (matches.isEmpty()) {
+                                        if (en) "No matching text was found." else "Não foi encontrado texto correspondente."
+                                    } else {
+                                        (if (en) "${matches.size} matching line(s):\n" else "${matches.size} linha(s) encontrada(s):\n") +
+                                            matches.joinToString("\n") { "• " + it.take(180) }
+                                    }
+                                }.getOrElse { it.message ?: (if (en) "Search failed." else "A pesquisa falhou.") }
+                                searching = false
+                            }
+                        }
+                    }
+                ) { Text(if (searching) { if (en) "Searching…" else "A pesquisar…" } else { if (en) "Search" else "Pesquisar" }, color = MaxCyan) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSearch = false }) { Text(if (en) "Close" else "Fechar", color = MaxMuted) }
+            },
+            containerColor = Color(0xFF102541)
+        )
+    }
+
+    if (showProperties) {
+        AlertDialog(
+            onDismissRequest = { showProperties = false },
+            title = { Text(if (en) "Document properties" else "Propriedades do documento", color = Color.White) },
+            text = { Text(propertiesText, color = MaxMuted, fontSize = 11.sp, lineHeight = 16.sp) },
+            confirmButton = { TextButton(onClick = { showProperties = false }) { Text(if (en) "Close" else "Fechar", color = MaxCyan) } },
+            containerColor = Color(0xFF102541)
+        )
+    }
 }
 
 @Composable
-private fun ReaderAction(icon: ImageVector, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.widthIn(min = 43.dp)) {
+private fun ReaderAction(icon: ImageVector, label: String, english: Boolean, click: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.widthIn(min = 43.dp).clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = click).padding(horizontal = 3.dp, vertical = 4.dp)
+    ) {
         Icon(icon, null, tint = Color(0xFFE4EEFF), modifier = Modifier.size(19.dp))
         Spacer(Modifier.height(4.dp))
-        Text(label, color = Color(0xFFD6E2F7), fontSize = 9.sp)
+        Text(label, color = Color(0xFFD6E2F7), fontSize = 9.sp, maxLines = 1)
     }
 }
 
@@ -668,9 +930,6 @@ private fun EditorPage(en: Boolean, uri: Uri?, openPdf: () -> Unit, choose: (Too
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(if (en) "Edit PDF" else "Editar PDF", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            IconButton(onClick = {}) { Icon(Icons.Default.Undo, null, tint = MaxText) }
-            IconButton(onClick = {}) { Icon(Icons.Default.Redo, null, tint = MaxText) }
-            IconButton(onClick = {}) { Icon(Icons.Default.Check, null, tint = Color(0xFF55D6A4)) }
         }
         PdfPagePreview(uri)
         Spacer(Modifier.height(10.dp))
@@ -796,21 +1055,95 @@ private fun ProtectPage(en: Boolean) {
 
 @Composable
 private fun SettingsPage(en: Boolean, changeLanguage: () -> Unit) {
+    val context = LocalContext.current
+    val storageSummary = remember(en) {
+        runCatching {
+            val stats = android.os.StatFs(android.os.Environment.getExternalStorageDirectory().absolutePath)
+            val free = android.text.format.Formatter.formatShortFileSize(context, stats.availableBytes)
+            val total = android.text.format.Formatter.formatShortFileSize(context, stats.totalBytes)
+            if (en) "$free free of $total" else "$free livres de $total"
+        }.getOrElse { if (en) "Storage information unavailable" else "Informação de armazenamento indisponível" }
+    }
+
+    fun openAndroidAppSettings() {
+        runCatching {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + context.packageName)
+                )
+            )
+        }
+    }
+
+    fun openSupport() {
+        runCatching {
+            context.startActivity(
+                Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/issues")
+                )
+            )
+        }
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
-        PageTitle(if (en) "Settings" else "Configurações", if (en) "Personalize your PDF Max experience" else "Personalize a sua experiência no PDF Max")
+        PageTitle(
+            if (en) "Settings" else "Configurações",
+            if (en) "Manage your PDF Max preferences and device access" else "Gira as preferências do PDF Max e o acesso ao dispositivo"
+        )
         SettingsGroup(if (en) "PREFERENCES" else "PREFERÊNCIAS")
-        SettingRow(Icons.Default.Palette, if (en) "Appearance" else "Aparência", if (en) "Dark mode" else "Modo escuro", true)
-        SettingRow(Icons.Default.Language, if (en) "Language" else "Idioma", if (en) "English / Português" else "Português / English", false, changeLanguage)
-        SettingRow(Icons.Default.Notifications, if (en) "Notifications" else "Notificações", if (en) "App alerts" else "Avisos da aplicação", true)
+        SettingRow(
+            Icons.Default.Palette,
+            if (en) "Appearance" else "Aparência",
+            if (en) "Premium dark interface" else "Interface escura premium"
+        )
+        SettingRow(
+            Icons.Default.Language,
+            if (en) "Language" else "Idioma",
+            if (en) "English / Português" else "Português / English",
+            changeLanguage
+        )
+        SettingRow(
+            Icons.Default.Notifications,
+            if (en) "Notifications" else "Notificações",
+            if (en) "No push notifications are configured in this release." else "Esta versão não configura notificações push."
+        )
         SettingsGroup(if (en) "STORAGE & PRIVACY" else "ARMAZENAMENTO E PRIVACIDADE")
-        SettingRow(Icons.Default.Storage, if (en) "Storage" else "Armazenamento", "12.4 GB / 64 GB", false)
-        SettingRow(Icons.Default.Security, if (en) "Privacy" else "Privacidade", if (en) "Permissions and data" else "Permissões e dados", false)
-        SettingRow(Icons.Default.Cloud, if (en) "Cloud sync" else "Sincronização na nuvem", if (en) "Not configured" else "Não configurada", false)
-        SettingsGroup(if (en) "ABOUT" else "SOBRE")
-        SettingRow(Icons.Default.Help, if (en) "Help & support" else "Ajuda e suporte", "FAQ • Contact", false)
-        SettingRow(Icons.Default.Info, if (en) "About PDF Max" else "Sobre o PDF Max", "Version 1.0.0", false)
+        SettingRow(
+            Icons.Default.Storage,
+            if (en) "Device storage" else "Armazenamento do dispositivo",
+            storageSummary
+        )
+        SettingRow(
+            Icons.Default.Security,
+            if (en) "App permissions" else "Permissões da aplicação",
+            if (en) "Review document and camera access in Android settings" else "Reveja o acesso a documentos e à câmara nas definições Android",
+            ::openAndroidAppSettings
+        )
+        SettingRow(
+            Icons.Default.Cloud,
+            if (en) "Cloud sync" else "Sincronização na nuvem",
+            if (en) "Not available in this release" else "Ainda não disponível nesta versão"
+        )
+        SettingsGroup(if (en) "SUPPORT & ABOUT" else "SUPORTE E SOBRE")
+        SettingRow(
+            Icons.Default.Help,
+            if (en) "Help & support" else "Ajuda e suporte",
+            if (en) "Open the PDF Max issue tracker" else "Abrir o suporte do PDF Max no GitHub",
+            ::openSupport
+        )
+        SettingRow(
+            Icons.Default.Info,
+            if (en) "About PDF Max" else "Sobre o PDF Max",
+            "PDF Max 1.2.4 • Android 8.0+"
+        )
         Spacer(Modifier.height(18.dp))
-        Text("PDF Max – PDF Editor & Reader", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+        Text(
+            "PDF Max – PDF Editor & Reader",
+            color = MaxMuted, fontSize = 10.sp,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
     }
 }
 
@@ -876,9 +1209,9 @@ private fun SideMenu(current: Page, en: Boolean, navigate: (Page) -> Unit, langu
         DrawerItem(Icons.Default.Home, if (en) "Home" else "Início", current == Page.HOME) { navigate(Page.HOME) }
         DrawerItem(Icons.Default.FolderOpen, if (en) "My files" else "Meus Arquivos", current == Page.FILES) { navigate(Page.FILES) }
         DrawerItem(Icons.Default.GridView, if (en) "Tools" else "Ferramentas", current == Page.TOOLS) { navigate(Page.TOOLS) }
-        DrawerItem(Icons.Default.Star, if (en) "Favorites" else "Favoritos", false) { navigate(Page.FILES) }
-        DrawerItem(Icons.Default.History, if (en) "Recent" else "Recentes", false) { navigate(Page.FILES) }
-        DrawerItem(Icons.Default.Delete, if (en) "Trash" else "Lixeira", false) { navigate(Page.FILES) }
+        DrawerItem(Icons.Default.Star, if (en) "Favorites" else "Favoritos", current == Page.FAVORITES) { navigate(Page.FAVORITES) }
+        DrawerItem(Icons.Default.History, if (en) "Recent" else "Recentes", current == Page.RECENT) { navigate(Page.RECENT) }
+        DrawerItem(Icons.Default.Delete, if (en) "Trash" else "Lixeira", current == Page.TRASH) { navigate(Page.TRASH) }
         Spacer(Modifier.height(17.dp))
         Text(if (en) "PREFERENCES" else "PREFERÊNCIAS", color = Color(0xFF7186A5), fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp, bottom = 7.dp))
         DrawerItem(Icons.Default.Settings, if (en) "Settings" else "Configurações", current == Page.SETTINGS) { navigate(Page.SETTINGS) }
@@ -892,7 +1225,7 @@ private fun SideMenu(current: Page, en: Boolean, navigate: (Page) -> Unit, langu
             Text(if (en) "English" else "Português", color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
             Text("PT / EN", color = MaxMuted, fontSize = 10.sp)
         }
-        Text("PDF Max  •  v1.2.3", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
+        Text("PDF Max  •  v1.2.4", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
     }
 }
 
@@ -980,17 +1313,24 @@ private fun SettingsGroup(text: String) {
 }
 
 @Composable
-private fun SettingRow(icon: ImageVector, title: String, detail: String, toggle: Boolean, click: () -> Unit = {}) {
-    var checked by remember { mutableStateOf(true) }
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { if (toggle) checked = !checked else click() }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun SettingRow(icon: ImageVector, title: String, detail: String, click: (() -> Unit)? = null) {
+    val rowModifier = if (click != null) {
+        Modifier.clickable { click() }
+    } else {
+        Modifier
+    }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .then(rowModifier).padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Icon(icon, null, tint = MaxCyan, modifier = Modifier.size(21.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(detail, color = MaxMuted, fontSize = 10.sp)
+            Text(detail, color = MaxMuted, fontSize = 10.sp, lineHeight = 14.sp)
         }
-        if (toggle) Switch(checked, { checked = it }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = MaxBlue))
-        else Icon(Icons.Default.ChevronRight, null, tint = MaxMuted)
+        if (click != null) Icon(Icons.Default.ChevronRight, null, tint = MaxMuted)
     }
     Divider(color = Color(0xFF1C2E49))
 }
@@ -1018,6 +1358,8 @@ internal fun localizedToolTitle(title: String, english: Boolean): String {
         "Remover páginas" -> "Delete pages"; "Extrair texto PDF" -> "Extract PDF text"; "Criar ZIP" -> "Create ZIP"
         "Detetar duplicados" -> "Find duplicates"; "Extrair páginas" -> "Extract pages"
         "Adicionar página em branco" -> "Add blank page"; "Editar metadados" -> "Edit metadata"
+        "Achatar formulários" -> "Flatten forms"; "Remover metadados" -> "Remove metadata"
+        "Relatório do PDF" -> "PDF report"
         else -> title
     }
 }
@@ -1040,6 +1382,9 @@ internal fun localizedToolSubtitle(title: String, english: Boolean): String {
         "Criar ZIP" -> "Archive multiple files"; "Detetar duplicados" -> "Find exact copies"
         "Extrair páginas" -> "Create a PDF from selected pages"; "Adicionar página em branco" -> "Insert a new page"
         "Editar metadados" -> "Title, author and keywords"
+        "Achatar formulários" -> "Make existing form fields read-only page content"
+        "Remover metadados" -> "Clear standard document info and catalog XMP metadata"
+        "Relatório do PDF" -> "Pages, word count and extractable text"
         else -> tools.firstOrNull { it.title == title }?.subtitle.orEmpty()
     }
 }

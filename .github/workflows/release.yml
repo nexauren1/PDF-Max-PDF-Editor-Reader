@@ -6,7 +6,7 @@ on:
       tag_name:
         description: "Release tag, for example v1.0.0"
         required: true
-        default: "v1.0.0"
+        default: "v1.2.4"
         type: string
 
 permissions:
@@ -67,10 +67,13 @@ jobs:
           test -n "$ANDROID_KEY_PASSWORD"
           gradle assembleRelease bundleRelease
 
-      - name: Rename release packages
+      - name: Verify and rename optimized release packages
         run: |
+          test -s app/build/outputs/apk/release/app-release.apk
+          test -s app/build/outputs/bundle/release/app-release.aab
           cp app/build/outputs/apk/release/app-release.apk "PDF-Max-$RELEASE_TAG.apk"
           cp app/build/outputs/bundle/release/app-release.aab "PDF-Max-$RELEASE_TAG.aab"
+          du -h PDF-Max-$RELEASE_TAG.apk PDF-Max-$RELEASE_TAG.aab
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -83,6 +86,7 @@ jobs:
             PDF-Max-$RELEASE_TAG.apk
             PDF-Max-$RELEASE_TAG.aab
           body: |
-            PDF Max signed release APK and Android App Bundle.
-            The package is built with the private upload keystore and targets Android 16 (API 36).
+            PDF Max signed release APK and Android App Bundle. Google Play will generate device-specific APK splits from the AAB.
+            The package is built with the private upload keystore, targets Android 16 (API 36), and uses R8/resource shrinking.
+            Google Play should receive the AAB; the direct APK is universal while the Play-delivered install is device-optimized.
             Google Play App Signing and the required All files access declaration remain subject to Play Console setup and review.

@@ -10,9 +10,10 @@ android {
         applicationId = "com.nexauren.pdfmax"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.2.3"
+        versionCode = 9
+        versionName = "1.2.4"
     }
+    // Android App Bundles are automatically split by device ABI by Google Play.
     buildFeatures { compose = true }
     val signingStorePath = System.getenv("ANDROID_KEYSTORE_PATH")
     val signingStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
@@ -39,9 +40,14 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildTypes {
         getByName("release") {
-            // Use the private upload key when configured; otherwise keep preview builds installable.
+            // Production release builds are minified and resource-shrunk to reduce download size.
             signingConfig = if (hasReleaseCredentials) signingConfigs.getByName("upload") else signingConfigs.getByName("debug")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }

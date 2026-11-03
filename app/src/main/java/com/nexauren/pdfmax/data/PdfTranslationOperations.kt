@@ -41,7 +41,10 @@ object PdfTranslationOperations {
             require(translated.isNotBlank()) { "A tradução não devolveu texto." }
             val languageName = targetTag.uppercase()
             val outputTitle = input.nameWithoutExtension + "_translated_" + languageName
-            return PdfOperations.createPdfFromText(context, outputTitle, translated)
+            // Keep the required Google Translate attribution attached to the
+            // exported translation, not only in the in-app result screen.
+            val attributedText = translated + "\n\nPowered by Google Translate"
+            return PdfOperations.createPdfFromText(context, outputTitle, attributedText)
         } finally {
             translator.close()
         }
