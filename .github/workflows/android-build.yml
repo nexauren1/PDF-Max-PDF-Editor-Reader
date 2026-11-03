@@ -63,13 +63,13 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle assembleDebug assembleRelease bundleRelease
 
-      - name: Verify split packages and report sizes
+      - name: Verify release packages and report sizes
         run: |
-          test -s app/build/outputs/apk/release/app-arm64-v8a-release.apk
-          test -s app/build/outputs/apk/release/app-armeabi-v7a-release.apk
+          test -s app/build/outputs/apk/release/app-release.apk
           test -s app/build/outputs/bundle/release/app-release.aab
           echo "Release package sizes:"
-          du -h app/build/outputs/apk/release/*.apk app/build/outputs/bundle/release/app-release.aab
+          du -h app/build/outputs/apk/release/app-release.apk app/build/outputs/bundle/release/app-release.aab
+          echo "Google Play will generate device-specific APK splits from the AAB."
 
       - name: Upload APK and AAB artifacts
         uses: actions/upload-artifact@v4
@@ -77,7 +77,7 @@ jobs:
           name: pdf-max-apks
           path: |
             app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/release/app-release.apk
             app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 30
@@ -93,8 +93,7 @@ jobs:
           prerelease: false
           make_latest: true
           files: |
-            app/build/outputs/apk/release/app-arm64-v8a-release.apk
-            app/build/outputs/apk/release/app-armeabi-v7a-release.apk
+            app/build/outputs/apk/release/app-release.apk
             app/build/outputs/bundle/release/app-release.aab
           body: |
             PDF Max v1.2.4 stable GitHub release.
