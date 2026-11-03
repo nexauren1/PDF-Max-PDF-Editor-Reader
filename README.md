@@ -67,7 +67,7 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 - GitHub Actions builds Debug APKs, a privately signed universal Release APK for direct device testing, and a signed Android App Bundle (AAB).
 - Release builds use R8 code shrinking and resource shrinking. CI prints APK/AAB sizes. Google Play should receive the AAB; Google Play generates device-specific APK splits automatically.
 - Release jobs validate the private upload keystore, password and alias before building. They fail instead of publishing a debug-signed production package.
-- The next stable GitHub release is tagged `v1.2.4`; upload the AAB to Google Play, not the debug APK.
+- The next stable GitHub release is tagged `v1.2.5`; upload the AAB to Google Play, not the debug APK.
 
 ## Google Play policy note
 
