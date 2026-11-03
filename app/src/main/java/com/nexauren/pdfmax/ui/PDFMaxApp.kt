@@ -836,7 +836,7 @@ private fun SettingsPage(en: Boolean, changeLanguage: () -> Unit) {
         SettingRow(Icons.Default.Cloud, if (en) "Cloud sync" else "Sincronização na nuvem", if (en) "Not configured" else "Não configurada", false)
         SettingsGroup(if (en) "ABOUT" else "SOBRE")
         SettingRow(Icons.Default.Help, if (en) "Help & support" else "Ajuda e suporte", "FAQ • Contact", false)
-        SettingRow(Icons.Default.Info, if (en) "About PDF Max" else "Sobre o PDF Max", "Version 1.0.0", false)
+        SettingRow(Icons.Default.Info, if (en) "About PDF Max" else "Sobre o PDF Max", "Version 1.2.4", false)
         Spacer(Modifier.height(18.dp))
         Text("PDF Max – PDF Editor & Reader", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
     }
@@ -920,7 +920,7 @@ private fun SideMenu(current: Page, en: Boolean, navigate: (Page) -> Unit, langu
             Text(if (en) "English" else "Português", color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
             Text("PT / EN", color = MaxMuted, fontSize = 10.sp)
         }
-        Text("PDF Max  •  v1.2.3", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
+        Text("PDF Max  •  v1.2.4", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
     }
 }
 
