@@ -65,7 +65,7 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 - Compile SDK 36 and target SDK 36 (Android 16); minimum Android 8.0 (API 26).
 - GitHub Actions builds a Debug APK, a privately signed Release APK and a signed Android App Bundle (AAB).
 - Release jobs validate the private upload keystore, password and alias before building. They fail instead of publishing a debug-signed production package.
-- The stable GitHub release is tagged `v1.2.3`; upload the AAB to Google Play, not the debug APK.
+- The stable GitHub release is tagged `v1.2.4`; upload the AAB to Google Play, not the debug APK.
 
 ## Google Play policy note
 
