@@ -3,6 +3,7 @@ package com.nexauren.pdfmax.data
 import android.content.Context
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.io.File
 import java.io.FileOutputStream
@@ -13,7 +14,7 @@ import java.util.zip.ZipOutputStream
 object OfficeExportOperations {
     fun pdfToPowerPoint(context: Context, input: File): File {
         PDFBoxResourceLoader.init(context.applicationContext)
-        val text = PDDocument.load(input).use { PDFTextStripper().getText(it) }
+        val text = PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { PDFTextStripper().getText(it) }
         require(text.isNotBlank()) { "O PDF não contém texto selecionável para exportar." }
 
         val paragraphs = text.replace("\r", "").lines().filter { it.isNotBlank() }
