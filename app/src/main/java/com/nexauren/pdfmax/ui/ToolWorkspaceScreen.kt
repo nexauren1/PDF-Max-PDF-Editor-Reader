@@ -738,7 +738,12 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             listOf(90, 180, 270).forEach { deg -> ChoiceChip(deg.toString() + "°", rotation == deg, { rotation = deg }, tool.color) }
                         }
                     }
-                    "Proteger PDF" -> OutlinedTextField(password, { password = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "PDF password (min. 4 chars)" else "Senha do PDF (mín. 4 caracteres)") }, visualTransformation = PasswordVisualTransformation(), colors = toolFieldColors(), singleLine = true)
+                    "Proteger PDF" -> OutlinedTextField(password, { password = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (english) "PDF password (min. 8 chars)" else "Senha do PDF (mín. 8 caracteres)") }, visualTransformation = PasswordVisualTransformation(), colors = toolFieldColors(tool.color), singleLine = true)
+                    "Proteger PDF · info" -> InfoLine(
+                        if (english) "Encrypted copy using AES-128 and an opening password. Use at least 8 characters. PDF permission flags are not a substitute for secure sharing."
+                        else "Cópia encriptada com AES-128 e palavra-passe de abertura. Utilize pelo menos 8 caracteres. As restrições do formato PDF não substituem uma partilha segura.",
+                        Icons.Default.Security
+                    )
                     "Converter PDF" -> {
                         Text(if (english) "Export format" else "Formato de exportação", color = MaxMuted, fontSize = 10.sp)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
