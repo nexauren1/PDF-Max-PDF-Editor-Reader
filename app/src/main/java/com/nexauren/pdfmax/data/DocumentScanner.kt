@@ -282,7 +282,7 @@ object DocumentScanner {
             }
 
             val result = found.values.sortedByDescending { it.modified }
-            if (mediaStoreWorked && result.isEmpty() && cachedFiles.isNotEmpty() && !fullScan) {
+            if (mediaStoreWorked && result.isEmpty() && cachedFiles.isNotEmpty() && (!fullScan || folderStats.rootsFound == 0 || folderStats.inaccessibleDirectories > 0 || folderStats.timedOut)) {
                 cachedAt = now
                 return cachedFiles
             }
