@@ -30,7 +30,7 @@ object AdvancedPdfOperations {
         require(pageOrder.isNotEmpty()) { "Indique pelo menos uma página." }
         require(pageOrder.distinct().size == pageOrder.size) { "A ordem não pode repetir páginas." }
         val destination = target(input, "organized")
-        PDDocument.load(input).use { source ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { source ->
             require(pageOrder.all { it in 1..source.numberOfPages }) { "A ordem contém uma página inexistente." }
             PDDocument().use { output ->
                 pageOrder.forEach { pageNumber -> output.importPage(source.getPage(pageNumber - 1)) }
@@ -44,7 +44,7 @@ object AdvancedPdfOperations {
     fun removePages(context: Context, input: File, pagesToRemove: Set<Int>): File {
         init(context)
         val destination = target(input, "pages_removed")
-        PDDocument.load(input).use { source ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { source ->
             require(pagesToRemove.isNotEmpty()) { "Selecione pelo menos uma página." }
             require(pagesToRemove.all { it in 1..source.numberOfPages }) { "A seleção contém uma página inexistente." }
             require(pagesToRemove.size < source.numberOfPages) { "Não pode eliminar todas as páginas." }
@@ -63,7 +63,7 @@ object AdvancedPdfOperations {
         init(context)
         require(fieldName.isNotBlank()) { "Indique o nome do campo do formulário." }
         val destination = target(input, "form_filled")
-        PDDocument.load(input).use { document ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { document ->
             val form = document.documentCatalog.acroForm
                 ?: error("Este PDF não contém um formulário AcroForm editável.")
             val field = form.getField(fieldName.trim())
@@ -76,7 +76,7 @@ object AdvancedPdfOperations {
 
     fun formFieldNames(context: Context, input: File): List<String> {
         init(context)
-        return PDDocument.load(input).use { document ->
+        return PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { document ->
             val form = document.documentCatalog.acroForm ?: return@use emptyList()
             form.fields.mapNotNull { it.fullyQualifiedName }.filter { it.isNotBlank() }.sorted()
         }
@@ -113,7 +113,7 @@ object AdvancedPdfOperations {
                 }
             }
             val destination = target(input, "signed")
-            PDDocument.load(input).use { document ->
+            PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { document ->
                 require(document.numberOfPages > 0) { "O PDF não contém páginas." }
                 val page = document.getPage(document.numberOfPages - 1)
                 val image = LosslessFactory.createFromImage(document, bitmap)
@@ -186,7 +186,7 @@ object AdvancedPdfOperations {
     fun insertBlankPage(context: Context, input: File, pageAfter: Int): File {
         init(context)
         val destination = target(input, "blank_page_added")
-        PDDocument.load(input).use { source ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { source ->
             require(pageAfter in 0..source.numberOfPages) {
                 "A posição deve estar entre 0 e " + source.numberOfPages + "."
             }
@@ -223,7 +223,7 @@ object AdvancedPdfOperations {
     ): File {
         init(context)
         val destination = target(input, "metadata")
-        PDDocument.load(input).use { document ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { document ->
             document.documentInformation.title = title.trim()
             document.documentInformation.author = author.trim()
             document.documentInformation.subject = subject.trim()
@@ -240,7 +240,7 @@ object AdvancedPdfOperations {
     fun flattenForms(context: Context, input: File): File {
         init(context)
         val destination = target(input, "flattened")
-        PDDocument.load(input).use { document ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { document ->
             val form = document.documentCatalog.acroForm
                 ?: error("Este PDF não contém um formulário AcroForm.")
             require(form.fields.isNotEmpty()) { "O formulário não contém campos para achatar." }
@@ -258,7 +258,7 @@ object AdvancedPdfOperations {
     fun removeDocumentMetadata(context: Context, input: File): File {
         init(context)
         val destination = target(input, "metadata_removed")
-        PDDocument.load(input).use { document ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { document ->
             val info = document.documentInformation
             info.title = null
             info.author = null
