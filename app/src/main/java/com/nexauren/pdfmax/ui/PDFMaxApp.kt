@@ -1025,21 +1025,95 @@ private fun ProtectPage(en: Boolean) {
 
 @Composable
 private fun SettingsPage(en: Boolean, changeLanguage: () -> Unit) {
+    val context = LocalContext.current
+    val storageSummary = remember(en) {
+        runCatching {
+            val stats = android.os.StatFs(android.os.Environment.getExternalStorageDirectory().absolutePath)
+            val free = android.text.format.Formatter.formatShortFileSize(context, stats.availableBytes)
+            val total = android.text.format.Formatter.formatShortFileSize(context, stats.totalBytes)
+            if (en) "$free free of $total" else "$free livres de $total"
+        }.getOrElse { if (en) "Storage information unavailable" else "Informação de armazenamento indisponível" }
+    }
+
+    fun openAndroidAppSettings() {
+        runCatching {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + context.packageName)
+                )
+            )
+        }
+    }
+
+    fun openSupport() {
+        runCatching {
+            context.startActivity(
+                Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/issues")
+                )
+            )
+        }
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
-        PageTitle(if (en) "Settings" else "Configurações", if (en) "Personalize your PDF Max experience" else "Personalize a sua experiência no PDF Max")
+        PageTitle(
+            if (en) "Settings" else "Configurações",
+            if (en) "Manage your PDF Max preferences and device access" else "Gira as preferências do PDF Max e o acesso ao dispositivo"
+        )
         SettingsGroup(if (en) "PREFERENCES" else "PREFERÊNCIAS")
-        SettingRow(Icons.Default.Palette, if (en) "Appearance" else "Aparência", if (en) "Dark mode" else "Modo escuro", true)
-        SettingRow(Icons.Default.Language, if (en) "Language" else "Idioma", if (en) "English / Português" else "Português / English", false, changeLanguage)
-        SettingRow(Icons.Default.Notifications, if (en) "Notifications" else "Notificações", if (en) "App alerts" else "Avisos da aplicação", true)
+        SettingRow(
+            Icons.Default.Palette,
+            if (en) "Appearance" else "Aparência",
+            if (en) "Premium dark interface" else "Interface escura premium"
+        )
+        SettingRow(
+            Icons.Default.Language,
+            if (en) "Language" else "Idioma",
+            if (en) "English / Português" else "Português / English",
+            changeLanguage
+        )
+        SettingRow(
+            Icons.Default.Notifications,
+            if (en) "Notifications" else "Notificações",
+            if (en) "No push notifications are configured in this release." else "Esta versão não configura notificações push."
+        )
         SettingsGroup(if (en) "STORAGE & PRIVACY" else "ARMAZENAMENTO E PRIVACIDADE")
-        SettingRow(Icons.Default.Storage, if (en) "Storage" else "Armazenamento", "12.4 GB / 64 GB", false)
-        SettingRow(Icons.Default.Security, if (en) "Privacy" else "Privacidade", if (en) "Permissions and data" else "Permissões e dados", false)
-        SettingRow(Icons.Default.Cloud, if (en) "Cloud sync" else "Sincronização na nuvem", if (en) "Not configured" else "Não configurada", false)
-        SettingsGroup(if (en) "ABOUT" else "SOBRE")
-        SettingRow(Icons.Default.Help, if (en) "Help & support" else "Ajuda e suporte", "FAQ • Contact", false)
-        SettingRow(Icons.Default.Info, if (en) "About PDF Max" else "Sobre o PDF Max", "Version 1.2.4", false)
+        SettingRow(
+            Icons.Default.Storage,
+            if (en) "Device storage" else "Armazenamento do dispositivo",
+            storageSummary
+        )
+        SettingRow(
+            Icons.Default.Security,
+            if (en) "App permissions" else "Permissões da aplicação",
+            if (en) "Review document and camera access in Android settings" else "Reveja o acesso a documentos e à câmara nas definições Android",
+            ::openAndroidAppSettings
+        )
+        SettingRow(
+            Icons.Default.Cloud,
+            if (en) "Cloud sync" else "Sincronização na nuvem",
+            if (en) "Not available in this release" else "Ainda não disponível nesta versão"
+        )
+        SettingsGroup(if (en) "SUPPORT & ABOUT" else "SUPORTE E SOBRE")
+        SettingRow(
+            Icons.Default.Help,
+            if (en) "Help & support" else "Ajuda e suporte",
+            if (en) "Open the PDF Max issue tracker" else "Abrir o suporte do PDF Max no GitHub",
+            ::openSupport
+        )
+        SettingRow(
+            Icons.Default.Info,
+            if (en) "About PDF Max" else "Sobre o PDF Max",
+            "PDF Max 1.2.4 • Android 8.0+"
+        )
         Spacer(Modifier.height(18.dp))
-        Text("PDF Max – PDF Editor & Reader", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+        Text(
+            "PDF Max – PDF Editor & Reader",
+            color = MaxMuted, fontSize = 10.sp,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
     }
 }
 
@@ -1209,17 +1283,24 @@ private fun SettingsGroup(text: String) {
 }
 
 @Composable
-private fun SettingRow(icon: ImageVector, title: String, detail: String, toggle: Boolean, click: () -> Unit = {}) {
-    var checked by remember { mutableStateOf(true) }
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { if (toggle) checked = !checked else click() }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun SettingRow(icon: ImageVector, title: String, detail: String, click: (() -> Unit)? = null) {
+    val rowModifier = if (click != null) {
+        Modifier.clickable { click() }
+    } else {
+        Modifier
+    }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .then(rowModifier).padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Icon(icon, null, tint = MaxCyan, modifier = Modifier.size(21.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(detail, color = MaxMuted, fontSize = 10.sp)
+            Text(detail, color = MaxMuted, fontSize = 10.sp, lineHeight = 14.sp)
         }
-        if (toggle) Switch(checked, { checked = it }, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = MaxBlue))
-        else Icon(Icons.Default.ChevronRight, null, tint = MaxMuted)
+        if (click != null) Icon(Icons.Default.ChevronRight, null, tint = MaxMuted)
     }
     Divider(color = Color(0xFF1C2E49))
 }
