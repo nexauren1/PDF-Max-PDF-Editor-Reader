@@ -6,7 +6,7 @@ on:
       tag_name:
         description: "Release tag, for example v1.0.0"
         required: true
-        default: "v1.2.4"
+        default: "v1.2.5"
         type: string
 
 permissions:
@@ -65,7 +65,7 @@ jobs:
           test -n "$ANDROID_KEYSTORE_PASSWORD"
           test -n "$ANDROID_KEY_ALIAS"
           test -n "$ANDROID_KEY_PASSWORD"
-          gradle assembleRelease bundleRelease
+          gradle testDebugUnitTest assembleRelease bundleRelease
 
       - name: Verify signed release packages and report sizes
         run: |
