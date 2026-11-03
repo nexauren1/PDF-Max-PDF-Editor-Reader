@@ -69,7 +69,7 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 - PDF processing uses disk-backed PDFBox scratch storage for memory-intensive operations; image-to-PDF decodes images at a bounded resolution to reduce RAM spikes.
 - Release builds use R8 code shrinking and resource shrinking. CI prints APK/AAB sizes. Google Play should receive the AAB; Google Play generates device-specific APK splits automatically.
 - Release jobs validate the private upload keystore, password and alias before building. They fail instead of publishing a debug-signed production package.
-- The next stable GitHub release is tagged `v1.2.5`; upload the AAB to Google Play, not the debug APK.
+- The next candidate build is `v1.2.5`. Stable publication is deliberately gated by the repository variable `PUBLISH_STABLE_RELEASE=true`; do not enable it until a signed build has passed the required physical-device regression tests. Upload the AAB to Google Play, not the debug APK.
 
 ## Google Play policy note
 
