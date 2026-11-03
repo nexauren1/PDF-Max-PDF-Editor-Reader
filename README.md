@@ -8,7 +8,7 @@ The UI follows the supplied PDF Max reference:
 - Deep navy interface, electric-blue borders and violet accents.
 - Color-coded tool cards with category filters and a separate tool workspace with matching accent color.\n- Every operation follows three screens: file selection and options, visible processing with elapsed time, then result review and explicit save.
 - Dashboard with recent documents, quick actions and an internal document library.
-- Reader with page navigation, previews, zoom, text search, saved bookmarks, night display, sharing, printing and PDF properties.
+- Reader with page navigation, previews, zoom, text search, persistent bookmarks, night display, sharing, printing and PDF properties. Navigation between different tool workspaces is animated too.
 - In-app bottom navigation and a full side drawer.
 
 ## Internal document library
@@ -33,12 +33,12 @@ On Android 11 and later, full device scanning requires the Android “All files 
 - Reorder, extract, remove selected pages and insert blank pages.
 - Rotate pages, add text overlays, watermarks and page numbering.
 - Set PDF open passwords.
-- Fill existing AcroForm text fields by field name.
+- Fill existing AcroForm text fields by field name; flatten existing form fields into fixed page content.
 - Add a handwritten visual signature stamp to a PDF.
 - Extract text to UTF-8 TXT and images; convert PDF pages to images.
 - Batch-create a multi-page PDF from selected images and run batch OCR on several scans into one searchable PDF.
 - Create ZIP archives from selected documents and detect exact duplicate files with SHA-256 (no automatic deletion).
-- Edit PDF title, author, subject and keywords.
+- Edit PDF title, author, subject and keywords; remove standard document information and the catalog XMP metadata stream (embedded object metadata may remain).\n- Generate a PDF report with page count, file size, extractable word/line/character counts.
 - Create structured PDFs in the Writing Lab: title, subtitle, paragraphs, Sans/Serif/Mono fonts, Normal/Bold/Italic styles, adjustable body size, live preview and editable three-column tables.
 - OCR from an image using on-device ML Kit.
 - Capture a document photo inside the app using CameraX, then run OCR.
@@ -64,10 +64,10 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 
 - Android Gradle Plugin 8.10.1, Gradle 8.11.1 and JDK 17.
 - Compile SDK 36 and target SDK 36 (Android 16); minimum Android 8.0 (API 26).
-- GitHub Actions builds Debug APKs, privately signed Release APK splits for `arm64-v8a` and `armeabi-v7a`, and a signed Android App Bundle (AAB).
-- Release builds use R8 code shrinking and resource shrinking. ABI splits keep direct-install APKs from bundling native libraries for unrelated processor architectures; CI prints the resulting package sizes. Google Play should receive the AAB so it can deliver the device-matched APK set.
+- GitHub Actions builds Debug APKs, a privately signed universal Release APK for direct device testing, and a signed Android App Bundle (AAB).
+- Release builds use R8 code shrinking and resource shrinking. CI prints APK/AAB sizes. Google Play should receive the AAB; Google Play generates device-specific APK splits automatically.
 - Release jobs validate the private upload keystore, password and alias before building. They fail instead of publishing a debug-signed production package.
-- The next stable GitHub release is tagged `v1.2.4`; upload the AAB to Google Play, not a debug or architecture-specific APK.
+- The next stable GitHub release is tagged `v1.2.4`; upload the AAB to Google Play, not the debug APK.
 
 ## Google Play policy note
 
