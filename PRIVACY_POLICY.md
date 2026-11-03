@@ -1,6 +1,6 @@
 # PDF Max – Privacy Policy
 
-**Last updated: 31 October 2026**
+**Last updated: 3 November 2026**
 
 PDF Max is an Android PDF reader and document-management/editor application. This policy explains how the app accesses and handles information on your device.
 
@@ -8,7 +8,7 @@ PDF Max is an Android PDF reader and document-management/editor application. Thi
 
 PDF Max uses Android's **All files access** permission (`MANAGE_EXTERNAL_STORAGE`) to find supported documents in shared device storage, display its internal document library, and let you run document operations without selecting every source file in a separate file-picker app. The app reads and writes files only as needed for the document features you choose. Original documents are not automatically deleted.
 
-Generated files are saved in **Documents/PDF Max**. The library index (file names, paths, sizes and modification times) is stored in the app's private preferences so the library can be restored between sessions. This index is not a cloud backup. You can clear the app's data or uninstall PDF Max to remove its private index and preferences; files saved in shared Documents storage remain until you delete them.
+Generated files are saved in **Documents/PDF Max**. The library index (file names, paths, sizes and modification times), favourites, recently opened paths, reversible in-app trash entries and reader bookmarks are stored in the app's private preferences so the library can be restored between sessions. The in-app trash only hides an entry inside PDF Max; it does not delete or move the source document. This information is not a cloud backup. You can clear the app's data or uninstall PDF Max to remove its private index and preferences; files saved in shared Documents storage remain until you delete them.
 
 ## Camera and OCR
 
@@ -28,7 +28,7 @@ The Internet permission is used for required model downloads and related Google 
 
 ## Information collected by the developer
 
-The current app build does not ask you to create an account and does not collect your name, email address, precise location or contacts. The developer does not receive the private file index stored on your device.
+The current app build does not ask you to create an account and does not collect your name, email address, precise location or contacts. The developer does not receive the private file index, favourites, recent-file list, in-app trash list or reader bookmarks stored on your device.
 
 ## Data security and control
 
