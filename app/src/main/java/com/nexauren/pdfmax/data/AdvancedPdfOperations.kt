@@ -157,11 +157,10 @@ object AdvancedPdfOperations {
     fun imagesToPdf(context: Context, images: List<File>): File {
         init(context)
         require(images.isNotEmpty()) { "Selecione pelo menos uma imagem." }
-        val destination = File(PdfOperations.outputDirectory(), "PDF_Max_Scan_" + System.currentTimeMillis() + ".pdf")
+        val destination = File(PdfOperations.outputDirectory(), "PDF_Max_Scan_" + System.currentTimeMillis() + "_" + System.nanoTime() + ".pdf")
         PDDocument().use { document ->
             images.forEach { imageFile ->
-                val bitmap = android.graphics.BitmapFactory.decodeFile(imageFile.absolutePath)
-                    ?: error("Não foi possível abrir " + imageFile.name + ".")
+                val bitmap = PdfOperations.decodeImageForPdf(imageFile)
                 try {
                     val page = com.tom_roush.pdfbox.pdmodel.PDPage(com.tom_roush.pdfbox.pdmodel.common.PDRectangle.A4)
                     document.addPage(page)
