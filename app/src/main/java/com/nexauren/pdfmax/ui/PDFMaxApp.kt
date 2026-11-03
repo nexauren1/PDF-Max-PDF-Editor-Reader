@@ -110,8 +110,8 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
         val libraryPrefs = appContext.getSharedPreferences("pdfmax_library", android.content.Context.MODE_PRIVATE)
         val path = file.absolutePath
         val recent = libraryPrefs.getString("recent_paths", "").orEmpty()
-            .split("\\n").filter { it.isNotBlank() && it != path }
-        libraryPrefs.edit().putString("recent_paths", (listOf(path) + recent).take(50).joinToString("\\n")).apply()
+            .split("\n").filter { it.isNotBlank() && it != path }
+        libraryPrefs.edit().putString("recent_paths", (listOf(path) + recent).take(50).joinToString("\n")).apply()
         selectedFile = file
         pdfName = file.name
         pdfUri = Uri.fromFile(file)
