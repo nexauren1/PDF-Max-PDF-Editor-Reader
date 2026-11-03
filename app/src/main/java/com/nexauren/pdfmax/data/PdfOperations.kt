@@ -351,7 +351,7 @@ object PdfOperations {
     }
 
     private fun xmlEscape(value: String) = value.filter {
-        it == '\\t' || it == '\\n' || it == '\\r' ||
+        it == '\t' || it == '\n' || it == '\r' ||
             (it.code >= 0x20 && it.code != 0xFFFE && it.code != 0xFFFF)
     }.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     private fun latin(value: String): String {
