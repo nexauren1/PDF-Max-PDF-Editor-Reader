@@ -81,7 +81,6 @@ object PdfOperations {
     fun split(context: Context, input: File, firstPage: Int, lastPage: Int): List<File> {
         init(context)
         PDDocument.load(input).use { source ->
-            val start = (firstPage - 1).coerceAtLeast(0)
             require(firstPage >= 1 && lastPage >= firstPage && lastPage <= source.numberOfPages) {
                 "O intervalo deve estar entre 1 e " + source.numberOfPages + "."
             }
@@ -144,6 +143,7 @@ object PdfOperations {
                 .joinToString("") { "%02x".format(it.toInt() and 0xff) }
             val policy = StandardProtectionPolicy(ownerPassword, password, AccessPermission())
             policy.encryptionKeyLength = 128
+            policy.setPreferAES(true)
             doc.protect(policy)
             doc.save(target)
         }
