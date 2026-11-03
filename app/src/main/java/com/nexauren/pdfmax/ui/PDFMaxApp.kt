@@ -5,6 +5,13 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import java.io.File
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -146,23 +153,34 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                 Modifier.fillMaxSize().padding(insets)
                     .background(Brush.verticalGradient(listOf(Color(0xFF071329), Color(0xFF08162B), Color(0xFF050E20))))
             ) {
-                TopBar(screen, english, { scope.launch { drawer.open() } }, { go(Page.HOME) }, { go(Page.SETTINGS) })
-                when (screen) {
-                    Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { go(Page.FILES) }, ::openLocalFile)
-                    Page.FILES -> DocumentLibraryScreen(english, ::openLocalFile)
-                    Page.FAVORITES -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Favorites")
-                    Page.RECENT -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Recent")
-                    Page.TRASH -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Trash")
-                    Page.OFFICE -> OfficePreviewScreen(selectedFile, english) { go(Page.FILES) }
-                    Page.TOOLS -> ToolsPage(english, { openTool(it) })
-                    Page.READER -> ReaderPage(english, pdfName, pdfUri, selectedFile, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
-                    Page.CREATE_PDF -> PdfCreatorScreen(english)
-                    Page.EDITOR -> ToolWorkspaceScreen(tools.first { it.title == "Editar PDF" }, english)
-                    Page.CONVERTER -> ToolWorkspaceScreen(tools.first { it.title == "Converter PDF" }, english)
-                    Page.SCANNER -> ToolWorkspaceScreen(tools.first { it.title == "Digitalizar e OCR" }, english)
-                    Page.PROTECT -> ToolWorkspaceScreen(tools.first { it.title == "Proteger PDF" }, english)
-                    Page.SETTINGS -> SettingsPage(english, { toggleLanguage() })
-                    Page.TOOL -> ToolWorkspaceScreen(currentTool, english)
+                AnimatedContent(
+                    targetState = screen,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(220)) +
+                            slideInHorizontally(animationSpec = tween(220)) { width -> width / 18 }) togetherWith
+                            (fadeOut(animationSpec = tween(160)) +
+                                slideOutHorizontally(animationSpec = tween(160)) { width -> -width / 24 })
+                    },
+                    label = "PDF Max screen transition"
+                ) { targetScreen ->
+                    when (targetScreen) {
+                        Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { go(Page.FILES) }, ::openLocalFile)
+                        Page.FILES -> DocumentLibraryScreen(english, ::openLocalFile)
+                        Page.FAVORITES -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Favorites")
+                        Page.RECENT -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Recent")
+                        Page.TRASH -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Trash")
+                        Page.OFFICE -> OfficePreviewScreen(selectedFile, english) { go(Page.FILES) }
+                        Page.TOOLS -> ToolsPage(english, { openTool(it) })
+                        Page.READER -> ReaderPage(english, pdfName, pdfUri, selectedFile, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
+                        Page.CREATE_PDF -> PdfCreatorScreen(english)
+                        Page.EDITOR -> ToolWorkspaceScreen(tools.first { it.title == "Editar PDF" }, english)
+                        Page.CONVERTER -> ToolWorkspaceScreen(tools.first { it.title == "Converter PDF" }, english)
+                        Page.SCANNER -> ToolWorkspaceScreen(tools.first { it.title == "Digitalizar e OCR" }, english)
+                        Page.PROTECT -> ToolWorkspaceScreen(tools.first { it.title == "Proteger PDF" }, english)
+                        Page.SETTINGS -> SettingsPage(english, { toggleLanguage() })
+                        Page.TOOL -> ToolWorkspaceScreen(currentTool, english)
+                    }
                 }
             }
         }
