@@ -12,6 +12,11 @@ This checklist is separate from the GitHub Release. A successful GitHub build do
 - [ ] Verify that the package name `com.nexauren.pdfmax` is the intended permanent application ID.
 - [ ] Install the correct ABI-specific APK on at least one 64-bit ARM and one 32-bit ARM device; also test the AAB through Play internal testing.
 
+## Prepared submission materials
+- [x] Drafted a bilingual store listing with accurate feature limitations: [PLAY_STORE_LISTING.md](PLAY_STORE_LISTING.md).
+- [x] Drafted the All files access use-case explanation and evidence checklist: [GOOGLE_PLAY_PERMISSION_DECLARATION.md](GOOGLE_PLAY_PERMISSION_DECLARATION.md).
+- [ ] Capture actual screenshots and a permission-flow recording from the tested release build; do not submit concept-art mockups as app screenshots.
+
 ## Restricted file permission
 - [ ] Complete the Google Play Permissions Declaration Form for `MANAGE_EXTERNAL_STORAGE`.
 - [ ] Explain that PDF Max's core purpose includes locating and managing supported documents across shared storage; explain why user-selected SAF folders would materially impair the requested automatic library and indexing workflow.
