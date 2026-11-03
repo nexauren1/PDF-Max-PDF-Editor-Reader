@@ -360,11 +360,18 @@ private fun SectionTitle(title: String, action: String, onAction: () -> Unit) {
 
 @Composable
 private fun ToolGrid(list: List<ToolSpec>, onChoose: (ToolSpec) -> Unit, english: Boolean = false) {
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        list.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                row.forEach { ToolTile(it, Modifier.weight(1f), english) { onChoose(it) } }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+    // Wider cards make the tool catalogue easier to scan and leave room for
+    // each tool's real purpose, matching the dedicated-workspace design.
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        list.chunked(2).forEach { row ->
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                row.forEach { tool ->
+                    ToolTile(tool, Modifier.weight(1f), english) { onChoose(tool) }
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
@@ -372,18 +379,39 @@ private fun ToolGrid(list: List<ToolSpec>, onChoose: (ToolSpec) -> Unit, english
 
 @Composable
 private fun ToolTile(tool: ToolSpec, modifier: Modifier = Modifier, english: Boolean = false, click: () -> Unit) {
-    Column(
-        modifier.height(92.dp).clip(RoundedCornerShape(15.dp))
-            .background(Brush.linearGradient(listOf(tool.color.copy(alpha = 0.25f), Color(0xFF0D1B33), Color(0xFF101A31))))
-            .border(1.dp, tool.color.copy(alpha = 0.48f), RoundedCornerShape(15.dp))
-            .clickable(onClick = click).padding(horizontal = 6.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
+    Row(
+        modifier.heightIn(min = 96.dp).clip(RoundedCornerShape(16.dp))
+            .background(Brush.linearGradient(listOf(tool.color.copy(alpha = 0.24f), Color(0xFF0D1B33), Color(0xFF101A31))))
+            .border(1.dp, tool.color.copy(alpha = 0.52f), RoundedCornerShape(16.dp))
+            .clickable(onClick = click).padding(horizontal = 10.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(37.dp).clip(RoundedCornerShape(11.dp)).background(Brush.linearGradient(listOf(tool.color, tool.color.copy(alpha = 0.65f)))), contentAlignment = Alignment.Center) {
-            Icon(tool.icon, null, tint = Color.White, modifier = Modifier.size(21.dp))
+        Box(
+            Modifier.size(42.dp).clip(RoundedCornerShape(12.dp))
+                .background(Brush.linearGradient(listOf(tool.color, tool.color.copy(alpha = 0.62f)))),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(tool.icon, null, tint = Color.White, modifier = Modifier.size(23.dp))
         }
-        Spacer(Modifier.height(6.dp))
-        Text(localizedToolTitle(tool.title, english), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Text(
+                localizedToolTitle(tool.title, english),
+                color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                localizedToolSubtitle(tool.title, english),
+                color = MaxMuted, fontSize = 9.sp, lineHeight = 11.sp,
+                maxLines = 2, overflow = TextOverflow.Ellipsis
+            )
+        }
+        Spacer(Modifier.width(3.dp))
+        Icon(
+            Icons.Default.ChevronRight, null, tint = tool.color,
+            modifier = Modifier.size(17.dp)
+        )
     }
 }
 
