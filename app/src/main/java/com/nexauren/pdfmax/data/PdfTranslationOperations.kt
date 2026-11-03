@@ -43,7 +43,7 @@ object PdfTranslationOperations {
             val outputTitle = input.nameWithoutExtension + "_translated_" + languageName
             // Keep the required Google Translate attribution attached to the
             // exported translation, not only in the in-app result screen.
-            val attributedText = translated + "\\n\\nPowered by Google Translate"
+            val attributedText = translated + "\n\nPowered by Google Translate"
             return PdfOperations.createPdfFromText(context, outputTitle, attributedText)
         } finally {
             translator.close()
