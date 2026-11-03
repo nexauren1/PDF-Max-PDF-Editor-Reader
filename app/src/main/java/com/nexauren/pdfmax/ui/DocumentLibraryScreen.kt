@@ -48,7 +48,7 @@ import java.io.File
 import android.graphics.BitmapFactory
 
 @Composable
-fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
+fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit, initialFilter: String = "All") {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
@@ -56,7 +56,36 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
     var files by remember { mutableStateOf<List<IndexedDocument>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf("All") }
+    var filter by remember(initialFilter) { mutableStateOf(initialFilter) }
+    val libraryPrefs = remember(context) { context.getSharedPreferences("pdfmax_library", android.content.Context.MODE_PRIVATE) }
+    var favoritePaths by remember {
+        mutableStateOf(libraryPrefs.getStringSet("favorite_paths", emptySet()).orEmpty().toSet())
+    }
+    var trashedPaths by remember {
+        mutableStateOf(libraryPrefs.getStringSet("trashed_paths", emptySet()).orEmpty().toSet())
+    }
+    var recentPaths by remember {
+        mutableStateOf(libraryPrefs.getString("recent_paths", "").orEmpty().split("\\n").filter { it.isNotBlank() })
+    }
+
+    fun toggleFavorite(path: String) {
+        val next = if (path in favoritePaths) favoritePaths - path else favoritePaths + path
+        favoritePaths = next
+        libraryPrefs.edit().putStringSet("favorite_paths", next.toMutableSet()).apply()
+    }
+
+    fun toggleTrash(path: String) {
+        val next = if (path in trashedPaths) trashedPaths - path else trashedPaths + path
+        trashedPaths = next
+        libraryPrefs.edit().putStringSet("trashed_paths", next.toMutableSet()).apply()
+    }
+
+    fun openIndexedFile(item: IndexedDocument) {
+        val path = item.file.absolutePath
+        recentPaths = (listOf(path) + recentPaths.filterNot { it == path }).take(50)
+        libraryPrefs.edit().putString("recent_paths", recentPaths.joinToString("\\n")).apply()
+        onOpenFile(item.file)
+    }
     var scanned by remember { mutableStateOf(false) }
     var scanError by remember { mutableStateOf<String?>(null) }
     var awaitingPermissionReturn by remember { mutableStateOf(false) }
@@ -130,9 +159,16 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val visible = remember(files, query, filter) {
+    val visible = remember(files, query, filter, favoritePaths, trashedPaths, recentPaths) {
         files.filter { item ->
+            val path = item.file.absolutePath
             val matchesQuery = query.isBlank() || item.name.contains(query, true) || item.file.parent.orEmpty().contains(query, true)
+            val matchesMode = when (filter) {
+                "Favorites" -> path in favoritePaths && path !in trashedPaths
+                "Recent" -> path in recentPaths && path !in trashedPaths
+                "Trash" -> path in trashedPaths
+                else -> path !in trashedPaths
+            }
             val matchesType = when (filter) {
                 "PDF" -> item.kind == DocumentKind.PDF
                 "Word" -> item.kind == DocumentKind.WORD
@@ -141,19 +177,35 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
                 "Images" -> item.kind == DocumentKind.IMAGE
                 else -> true
             }
-            matchesQuery && matchesType
+            matchesQuery && matchesMode && matchesType
+        }.let { filtered ->
+            if (filter == "Recent") filtered.sortedBy { recentPaths.indexOf(it.file.absolutePath).let { rank -> if (rank < 0) Int.MAX_VALUE else rank } }
+            else filtered
         }
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(if (english) "My files" else "Meus Arquivos", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    if (access) {
-                        if (english) files.size.toString() + " files found on this device" else files.size.toString() + " ficheiros encontrados neste dispositivo"
-                    } else {
-                        if (english) "Internal document library" else "Biblioteca interna de documentos"
+                    when (filter) {
+                        "Favorites" -> if (english) "Favorites" else "Favoritos"
+                        "Recent" -> if (english) "Recent files" else "Recentes"
+                        "Trash" -> if (english) "Trash" else "Lixeira"
+                        else -> if (english) "My files" else "Meus Arquivos"
+                    },
+                    color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold
+                )
+                Text(
+                    when (filter) {
+                        "Favorites" -> if (english) "${visible.size} saved document(s)" else "${visible.size} documento(s) favorito(s)"
+                        "Recent" -> if (english) "Recently opened on this device" else "Documentos abertos recentemente"
+                        "Trash" -> if (english) "Items hidden from your main library" else "Itens ocultos da biblioteca principal"
+                        else -> if (access) {
+                            if (english) files.size.toString() + " files found on this device" else files.size.toString() + " ficheiros encontrados neste dispositivo"
+                        } else {
+                            if (english) "Internal document library" else "Biblioteca interna de documentos"
+                        }
                     },
                     color = MaxMuted, fontSize = 11.sp
                 )
@@ -180,12 +232,15 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
         }
         Spacer(Modifier.height(11.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-            listOf("All", "PDF", "Word", "Excel", "PPT", "Images").forEach { label ->
+            listOf("All", "PDF", "Word", "Excel", "PPT", "Images", "Favorites", "Recent", "Trash").forEach { label ->
                 val selected = filter == label
                 Box(Modifier.clip(CircleShape).background(if (selected) Color(0xFF087EEB) else Color(0xFF172A47)).clickable { filter = label }.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     Text(when (label) {
                         "All" -> if (english) "All" else "Todos"
                         "Images" -> if (english) "Images" else "Imagens"
+                        "Favorites" -> if (english) "Favorites" else "Favoritos"
+                        "Recent" -> if (english) "Recent" else "Recentes"
+                        "Trash" -> if (english) "Trash" else "Lixeira"
                         else -> label
                     }, color = Color.White, fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
                 }
@@ -220,7 +275,17 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit) {
                 modifier = Modifier.padding(bottom = 7.dp)
             )
             LazyColumn(contentPadding = PaddingValues(bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                items(visible, key = { it.file.absolutePath }) { item -> DocumentRow(item) { onOpenFile(item.file) } }
+                items(visible, key = { it.file.absolutePath }) { item ->
+                    val path = item.file.absolutePath
+                    DocumentRow(
+                        item = item,
+                        favorite = path in favoritePaths,
+                        trashed = path in trashedPaths,
+                        onClick = { if (path !in trashedPaths) openIndexedFile(item) },
+                        onToggleFavorite = { toggleFavorite(path) },
+                        onToggleTrash = { toggleTrash(path) }
+                    )
+                }
             }
         }
     }
@@ -347,7 +412,14 @@ private fun EmptyFilesCard(
 }
 
 @Composable
-private fun DocumentRow(item: IndexedDocument, onClick: () -> Unit) {
+private fun DocumentRow(
+    item: IndexedDocument,
+    favorite: Boolean,
+    trashed: Boolean,
+    onClick: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onToggleTrash: () -> Unit
+) {
     val (icon, accent) = when (item.kind) {
         DocumentKind.PDF -> Icons.Default.PictureAsPdf to Color(0xFFFF4D7A)
         DocumentKind.WORD -> Icons.Default.Description to Color(0xFF398BFF)
@@ -358,15 +430,33 @@ private fun DocumentRow(item: IndexedDocument, onClick: () -> Unit) {
         DocumentKind.ARCHIVE -> Icons.Default.FolderZip to Color(0xFFE2A33D)
         DocumentKind.OTHER -> Icons.Default.InsertDriveFile to Color(0xFF94A7C4)
     }
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.17f)), contentAlignment = Alignment.Center) { Icon(icon, null, tint = accent, modifier = Modifier.size(23.dp)) }
-        Spacer(Modifier.width(11.dp))
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = !trashed, onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.17f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = accent, modifier = Modifier.size(23.dp))
+        }
+        Spacer(Modifier.width(9.dp))
         Column(Modifier.weight(1f)) {
             Text(item.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(item.file.parent.orEmpty(), color = MaxMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(item.sizeLabel + "  •  " + item.extension.uppercase(), color = Color(0xFF7890B2), fontSize = 9.sp)
         }
-        Icon(Icons.Default.ChevronRight, null, tint = MaxMuted, modifier = Modifier.size(18.dp))
+        if (trashed) {
+            IconButton(onClick = onToggleTrash) {
+                Icon(Icons.Default.Restore, if (favorite) "Restore" else "Restore", tint = MaxCyan)
+            }
+        } else {
+            IconButton(onClick = onToggleFavorite) {
+                Icon(if (favorite) Icons.Default.Star else Icons.Default.StarBorder, null, tint = if (favorite) Color(0xFFFFC247) else MaxMuted)
+            }
+            IconButton(onClick = onToggleTrash) {
+                Icon(Icons.Default.DeleteOutline, null, tint = MaxMuted)
+            }
+        }
     }
     Divider(color = Color(0xFF1B2D49))
 }
