@@ -43,6 +43,7 @@ import com.nexauren.pdfmax.data.PdfTranslationOperations
 import com.nexauren.pdfmax.data.AdvancedPdfOperations
 import com.nexauren.pdfmax.data.OfficeExportOperations
 import com.nexauren.pdfmax.data.DocumentUtilityOperations
+import com.nexauren.pdfmax.data.PageNumberParser
 import com.nexauren.pdfmax.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -214,7 +215,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                 withContext(Dispatchers.IO) {
                     when (tool.title) {
                         "Juntar PDF" -> listOf(PdfOperations.merge(context, documents.filter { it.file.absolutePath in selectedPaths }.map { it.file }))
-                        "Dividir PDF" -> PdfOperations.split(context, file!!, firstPage.toIntOrNull() ?: 1, lastPage.toIntOrNull() ?: 1)
+                        "Dividir PDF" -> PdfOperations.split(context, file!!, firstPage.toIntOrNull() ?: error("Indique a primeira página com um número válido."), lastPage.toIntOrNull() ?: error("Indique a última página com um número válido."))
                         "Comprimir PDF" -> listOf(PdfOperations.compress(context, file!!))
                         "Proteger PDF" -> listOf(PdfOperations.protect(context, file!!, password))
                         "Rodar páginas" -> listOf(PdfOperations.rotate(context, file!!, rotation))
@@ -245,9 +246,9 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             else -> error(if (english) "This source/target format is not supported by the current converter." else "Este formato de origem/destino ainda não é suportado pelo conversor.")
                         }
                         "Criar PDF" -> listOf(PdfOperations.createPdfFromText(context, "Novo_Documento", textOption.ifBlank { "Documento criado com PDF Max" }))
-                        "Organizar páginas" -> listOf(AdvancedPdfOperations.reorderPages(context, file!!, pageOrder.split(",").mapNotNull { it.trim().toIntOrNull() }))
-                        "Extrair páginas" -> listOf(AdvancedPdfOperations.extractPages(context, file!!, pageOrder.split(",").mapNotNull { it.trim().toIntOrNull() }))
-                        "Adicionar página em branco" -> listOf(AdvancedPdfOperations.insertBlankPage(context, file!!, pageAfter.toIntOrNull() ?: 1))
+                        "Organizar páginas" -> listOf(AdvancedPdfOperations.reorderPages(context, file!!, PageNumberParser.parse(pageOrder)))
+                        "Extrair páginas" -> listOf(AdvancedPdfOperations.extractPages(context, file!!, PageNumberParser.parse(pageOrder)))
+                        "Adicionar página em branco" -> listOf(AdvancedPdfOperations.insertBlankPage(context, file!!, pageAfter.toIntOrNull() ?: error("Indique uma posição de página válida.")))
                         "Editar metadados" -> listOf(AdvancedPdfOperations.editMetadata(context, file!!, metadataTitle, metadataAuthor, metadataSubject, metadataKeywords))
                         "Achatar formulários" -> listOf(AdvancedPdfOperations.flattenForms(context, file!!))
                         "Remover metadados" -> listOf(AdvancedPdfOperations.removeDocumentMetadata(context, file!!))
@@ -269,7 +270,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             outputMessage = DocumentUtilityOperations.duplicateReport(groups)
                             emptyList()
                         }
-                        "Remover páginas" -> listOf(AdvancedPdfOperations.removePages(context, file!!, removePageNumbers.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()))
+                        "Remover páginas" -> listOf(AdvancedPdfOperations.removePages(context, file!!, PageNumberParser.parse(removePageNumbers).toSet()))
                         "Preencher formulários" -> listOf(AdvancedPdfOperations.fillFormField(context, file!!, formFieldName, formFieldValue))
                         "Traduzir PDF" -> listOf(PdfTranslationOperations.translatePdf(context, file!!, sourceLanguage, targetLanguage))
                         "Imprimir PDF" -> {
