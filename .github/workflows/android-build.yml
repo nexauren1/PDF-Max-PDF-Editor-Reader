@@ -63,22 +63,29 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle assembleDebug assembleRelease bundleRelease
 
-      - name: Verify release packages and report sizes
+      - name: Verify signed release packages and report sizes
         run: |
-          test -s app/build/outputs/apk/release/app-release.apk
-          test -s app/build/outputs/bundle/release/app-release.aab
-          echo "Release package sizes:"
-          du -h app/build/outputs/apk/release/app-release.apk app/build/outputs/bundle/release/app-release.aab
+          set -euo pipefail
+          APK_PATH="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          AAB_PATH="$(find app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' -print -quit)"
+          test -n "$APK_PATH" && test -s "$APK_PATH"
+          test -n "$AAB_PATH" && test -s "$AAB_PATH"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK_PATH"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK_PATH" | grep -F "package: name='com.nexauren.pdfmax'"
+          echo "Verified APK: $APK_PATH"
+          echo "Verified AAB: $AAB_PATH"
+          du -h "$APK_PATH" "$AAB_PATH"
+          cp "$APK_PATH" app-release-verified.apk
+          cp "$AAB_PATH" app-release-verified.aab
           echo "Google Play will generate device-specific APK splits from the AAB."
-
       - name: Upload APK and AAB artifacts
         uses: actions/upload-artifact@v4
         with:
           name: pdf-max-apks
           path: |
             app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/app-release.apk
-            app/build/outputs/bundle/release/app-release.aab
+            app-release-verified.apk
+            app-release-verified.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -86,8 +93,8 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.4
-          name: "PDF Max v1.2.4"
+          tag_name: v1.2.5
+          name: "PDF Max v1.2.5"
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           prerelease: false
@@ -96,7 +103,7 @@ jobs:
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/bundle/release/app-release.aab
           body: |
-            PDF Max v1.2.4 stable GitHub release.
+            PDF Max v1.2.5 stable GitHub release.
             Includes ABI-specific signed APKs (arm64-v8a and armeabi-v7a) and a signed AAB for Google Play submission.
             The app bundle lets Google Play deliver only the matching native libraries to each device.
             The release workflow validates the private upload keystore before compiling; it does not fall back to a debug signature.
