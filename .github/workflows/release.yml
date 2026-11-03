@@ -6,7 +6,7 @@ on:
       tag_name:
         description: "Release tag, for example v1.0.0"
         required: true
-        default: "v1.0.0"
+        default: "v1.2.4"
         type: string
 
 permissions:
@@ -67,10 +67,15 @@ jobs:
           test -n "$ANDROID_KEY_PASSWORD"
           gradle assembleRelease bundleRelease
 
-      - name: Rename release packages
+      - name: Verify and rename ABI-specific release packages
         run: |
-          cp app/build/outputs/apk/release/app-release.apk "PDF-Max-$RELEASE_TAG.apk"
+          test -s app/build/outputs/apk/release/app-arm64-v8a-release.apk
+          test -s app/build/outputs/apk/release/app-armeabi-v7a-release.apk
+          test -s app/build/outputs/bundle/release/app-release.aab
+          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "PDF-Max-$RELEASE_TAG-arm64-v8a.apk"
+          cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk "PDF-Max-$RELEASE_TAG-armeabi-v7a.apk"
           cp app/build/outputs/bundle/release/app-release.aab "PDF-Max-$RELEASE_TAG.aab"
+          du -h PDF-Max-$RELEASE_TAG-*.apk PDF-Max-$RELEASE_TAG.aab
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -80,9 +85,11 @@ jobs:
           generate_release_notes: true
           prerelease: true
           files: |
-            PDF-Max-$RELEASE_TAG.apk
+            PDF-Max-$RELEASE_TAG-arm64-v8a.apk
+            PDF-Max-$RELEASE_TAG-armeabi-v7a.apk
             PDF-Max-$RELEASE_TAG.aab
           body: |
-            PDF Max signed release APK and Android App Bundle.
-            The package is built with the private upload keystore and targets Android 16 (API 36).
+            PDF Max ABI-specific signed release APKs (arm64-v8a and armeabi-v7a) and Android App Bundle.
+            The package is built with the private upload keystore, targets Android 16 (API 36), and uses R8/resource shrinking.
+            Google Play should receive the AAB; direct APK installs must use the matching processor architecture.
             Google Play App Signing and the required All files access declaration remain subject to Play Console setup and review.
