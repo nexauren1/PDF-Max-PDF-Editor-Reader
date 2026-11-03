@@ -16,7 +16,7 @@ The camera permission is used only when you choose the in-app document capture f
 
 ## Translation
 
-When you choose PDF translation, PDF Max uses Google ML Kit's on-device translation models. The first use of a language pair downloads the required language models through Google Play services; translated document text is processed on the device. Scanned PDFs need OCR before text can be translated.
+When you choose PDF translation, PDF Max uses Google Translate through Google ML Kit's on-device translation models. The first use of a language pair downloads the required language models through Google Play services; translated document text is processed on the device. Scanned PDFs need OCR before text can be translated. Translations are automatic and can be inaccurate; review important content. Learn more at https://translate.google.com.
 
 ## Sharing and printing
 
