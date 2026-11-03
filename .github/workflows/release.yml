@@ -76,9 +76,9 @@ jobs:
           test -n "$AAB_PATH" && test -s "$AAB_PATH"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK_PATH"
           BADGING="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK_PATH")"
-          printf '%s\\n' "$BADGING" | grep -F "package: name='com.nexauren.pdfmax' versionCode='10' versionName='1.2.5'"
-          printf '%s\\n' "$BADGING" | grep -F "sdkVersion:'26'"
-          printf '%s\\n' "$BADGING" | grep -F "targetSdkVersion:'36'"
+          printf '%s\n' "$BADGING" | grep -F "package: name='com.nexauren.pdfmax' versionCode='10' versionName='1.2.5'"
+          printf '%s\n' "$BADGING" | grep -F "sdkVersion:'26'"
+          printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'36'"
           jarsigner -verify -verbose -certs "$AAB_PATH" >/dev/null
           echo "Verified APK identity/version and AAB signature: $APK_PATH / $AAB_PATH"
           echo "Verified AAB: $AAB_PATH"
