@@ -33,7 +33,7 @@ object OfficeTextExtractor {
                     if (output.length >= 120_000) break
                     val decoded = decode(match.groupValues[1])
                     if (decoded.isNotBlank()) {
-                        if (output.isNotEmpty()) output.append('\\n')
+                        if (output.isNotEmpty()) output.append(10.toChar())
                         output.append(decoded.take(120_000 - output.length))
                     }
                 }
