@@ -241,7 +241,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             val extracted = PdfOperations.extractText(context, file!!)
                             val words = extracted.trim().split(Regex("\\s+")).count { it.isNotBlank() }
                             val lines = extracted.lineSequence().count { it.isNotBlank() }
-                            outputMessage = PdfOperations.getProperties(context, file) +
+                            outputMessage = PdfOperations.getProperties(context, file!!) +
                                 "\\nPalavras extraídas: " + words +
                                 "\\nLinhas de texto: " + lines +
                                 "\\nCaracteres: " + extracted.length +
