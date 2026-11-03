@@ -124,6 +124,12 @@ object OfficeExportOperations {
     }
 
     private fun xmlEscape(value: String): String = value
-        .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        .replace("\"", "&quot;").replace("'", "&apos;")
-}
+        .filter {
+            it == '\t' || it == '\n' || it == '\r' ||
+                (it.code >= 0x20 && it.code != 0xFFFE && it.code != 0xFFFF)
+        }
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
