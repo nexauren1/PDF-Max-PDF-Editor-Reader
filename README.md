@@ -58,7 +58,7 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 - The handwritten signature is a visible handwritten stamp, not a certificate-backed cryptographic digital signature.
 - Filling forms supports existing AcroForm text fields, not every XFA form.
 - PDF re-save, repair and compression depend on the source; a saved file is not guaranteed to be smaller. The compression result screen compares the original and output sizes and reports the actual change. A severely corrupted file may not be recoverable.
-- PDF translation uses on-device ML Kit language models. The first use downloads the selected source/target models over Wi‑Fi (model downloads can be roughly 30 MB each); scanned PDFs need OCR before translation.
+- PDF translation is powered by Google Translate through on-device ML Kit language models. The first use downloads selected source/target models over Wi‑Fi; scanned PDFs need OCR before translation. Translation results are automatic and should be reviewed. The app labels the action and results with Google Translate attribution and links to https://translate.google.com.
 
 ## Build and release
 
