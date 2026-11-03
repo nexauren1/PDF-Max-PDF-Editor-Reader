@@ -65,7 +65,7 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit, initialF
         mutableStateOf(libraryPrefs.getStringSet("trashed_paths", emptySet()).orEmpty().toSet())
     }
     var recentPaths by remember {
-        mutableStateOf(libraryPrefs.getString("recent_paths", "").orEmpty().split("\\n").filter { it.isNotBlank() })
+        mutableStateOf(libraryPrefs.getString("recent_paths", "").orEmpty().split("\n").filter { it.isNotBlank() })
     }
 
     fun toggleFavorite(path: String) {
@@ -83,7 +83,7 @@ fun DocumentLibraryScreen(english: Boolean, onOpenFile: (File) -> Unit, initialF
     fun openIndexedFile(item: IndexedDocument) {
         val path = item.file.absolutePath
         recentPaths = (listOf(path) + recentPaths.filterNot { it == path }).take(50)
-        libraryPrefs.edit().putString("recent_paths", recentPaths.joinToString("\\n")).apply()
+        libraryPrefs.edit().putString("recent_paths", recentPaths.joinToString("\n")).apply()
         onOpenFile(item.file)
     }
     var scanned by remember { mutableStateOf(false) }
