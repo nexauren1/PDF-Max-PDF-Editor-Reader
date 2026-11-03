@@ -14,7 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,6 +32,8 @@ fun PdfPagePreview(
     modifier: Modifier = Modifier,
     pageIndex: Int = 0,
     thumbnail: Boolean = false,
+    zoom: Float = 1f,
+    nightMode: Boolean = false,
     onPageCount: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -87,8 +92,21 @@ fun PdfPagePreview(
             bitmap != null -> Image(
                 bitmap = bitmap!!.asImageBitmap(),
                 contentDescription = "Página " + (pageIndex + 1) + " do documento PDF",
-                modifier = if (thumbnail) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
-                contentScale = if (thumbnail) ContentScale.Fit else ContentScale.FillWidth
+                modifier = (if (thumbnail) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
+                    .graphicsLayer { scaleX = zoom.coerceIn(1f, 2.5f); scaleY = zoom.coerceIn(1f, 2.5f) },
+                contentScale = if (thumbnail) ContentScale.Fit else ContentScale.FillWidth,
+                colorFilter = if (nightMode && !thumbnail) {
+                    ColorFilter.colorMatrix(
+                        ColorMatrix(
+                            floatArrayOf(
+                                -1f, 0f, 0f, 0f, 255f,
+                                0f, -1f, 0f, 0f, 255f,
+                                0f, 0f, -1f, 0f, 255f,
+                                0f, 0f, 0f, 1f, 0f
+                            )
+                        )
+                    )
+                } else null
             )
             uri == null -> SampleDocumentPage()
             failed -> Text("Não foi possível pré-visualizar esta página.", color = Color.White)
