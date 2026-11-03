@@ -257,9 +257,9 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                             val words = extracted.trim().split(Regex("\\s+")).count { it.isNotBlank() }
                             val lines = extracted.lineSequence().count { it.isNotBlank() }
                             outputMessage = PdfOperations.getProperties(context, file!!) +
-                                "\\nPalavras extraídas: " + words +
-                                "\\nLinhas de texto: " + lines +
-                                "\\nCaracteres: " + extracted.length +
+                                "\nPalavras extraídas: " + words +
+                                "\nLinhas de texto: " + lines +
+                                "\nCaracteres: " + extracted.length +
                                 if (extracted.isBlank()) "\nAviso: não foi encontrado texto selecionável; execute OCR se o documento for uma digitalização." else ""
                             emptyList()
                         }
@@ -682,7 +682,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                 Button(onClick = { requestAccess() }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF087FF1))) { Text(if (english) "Grant access" else "Permitir acesso") }
             }
         } else {
-            ToolPanel(if (english) "1 · Select document" else "1 · Selecionar documento", tool.color) {
+            ToolPanel(toolSourceHeading(tool.title, english), tool.color) {
                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = MaxCyan)
                 OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text(if (english) "Search your files" else "Pesquisar os seus ficheiros") }, colors = toolFieldColors(tool.color))
                 if (tool.title == "Detetar duplicados") {
@@ -726,7 +726,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                 if (eligible.size > 8) TextButton(onClick = { showAll = !showAll }) { Text(if (showAll) { if (english) "Show fewer" else "Mostrar menos" } else { if (english) "Show more files (" + eligible.size + ")" else "Mostrar mais ficheiros (" + eligible.size + ")" }, color = MaxCyan) }
             }
 
-            ToolPanel(if (english) "2 · Options" else "2 · Opções", tool.color) {
+            ToolPanel(toolOptionsHeading(tool.title, english), tool.color) {
                 when (tool.title) {
                     "Dividir PDF" -> {
                         NumberField(if (english) "First page" else "Primeira página", firstPage, tool.color) { firstPage = it }
@@ -888,6 +888,26 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
         }
     }
     }
+}
+
+private fun toolSourceHeading(title: String, english: Boolean): String = when (title) {
+    "Juntar PDF" -> if (english) "1 · PDFS TO MERGE" else "1 · PDFs PARA JUNTAR"
+    "Comparar PDFs" -> if (english) "1 · DOCUMENTS TO COMPARE" else "1 · DOCUMENTOS PARA COMPARAR"
+    "Digitalizar e OCR", "Imagem para PDF" -> if (english) "1 · IMAGES & SCANS" else "1 · IMAGENS E DIGITALIZAÇÕES"
+    "Criar ZIP" -> if (english) "1 · FILES TO ARCHIVE" else "1 · FICHEIROS PARA ARQUIVAR"
+    "Detetar duplicados" -> if (english) "1 · LIBRARY TO ANALYSE" else "1 · BIBLIOTECA PARA ANALISAR"
+    "Traduzir PDF" -> if (english) "1 · SOURCE DOCUMENT" else "1 · DOCUMENTO DE ORIGEM"
+    else -> if (english) "1 · SOURCE DOCUMENT" else "1 · DOCUMENTO DE ORIGEM"
+}
+
+private fun toolOptionsHeading(title: String, english: Boolean): String = when (title) {
+    "Editar PDF", "Adicionar texto", "Marca de água", "Numerar páginas" -> if (english) "2 · CONTENT & APPEARANCE" else "2 · CONTEÚDO E APARÊNCIA"
+    "Converter PDF" -> if (english) "2 · EXPORT SETTINGS" else "2 · DEFINIÇÕES DE EXPORTAÇÃO"
+    "Juntar PDF", "Dividir PDF", "Organizar páginas", "Extrair páginas", "Remover páginas", "Rodar páginas", "Adicionar página em branco" -> if (english) "2 · PAGE SETTINGS" else "2 · DEFINIÇÕES DE PÁGINA"
+    "Proteger PDF", "Assinar PDF", "Preencher formulários", "Achatar formulários", "Remover metadados" -> if (english) "2 · SECURITY & PRIVACY" else "2 · SEGURANÇA E PRIVACIDADE"
+    "Digitalizar e OCR", "Imagem para PDF", "PDF para imagem", "Extrair imagens" -> if (english) "2 · IMAGE PROCESSING" else "2 · PROCESSAMENTO DE IMAGEM"
+    "Traduzir PDF" -> if (english) "2 · LANGUAGE SETTINGS" else "2 · DEFINIÇÕES DE IDIOMA"
+    else -> if (english) "2 · OPERATION SETTINGS" else "2 · DEFINIÇÕES DA OPERAÇÃO"
 }
 
 @Composable
