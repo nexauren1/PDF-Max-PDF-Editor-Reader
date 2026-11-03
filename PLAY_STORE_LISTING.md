@@ -1,4 +1,4 @@
-# Google Play store listing — PDF Max 1.2.4 draft
+# Google Play store listing — PDF Max 1.2.5 draft
 
 Use the localized app name and descriptions in the matching Play Console store listing language. Capture the screenshots from the actual release build; generated concept art is not a substitute for real app screenshots.
 
