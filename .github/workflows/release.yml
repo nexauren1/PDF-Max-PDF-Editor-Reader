@@ -14,6 +14,7 @@ permissions:
 
 jobs:
   release:
+    if: vars.PUBLISH_STABLE_RELEASE == 'true'
     runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ github.event.inputs.tag_name || github.ref_name }}
