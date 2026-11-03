@@ -169,7 +169,7 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     val minimumSelection = if (tool.title == "Juntar PDF" || tool.title == "Comparar PDFs") 2 else 1
     val eligible = when (tool.title) {
         "Digitalizar e OCR", "Imagem para PDF" -> documents.filter { it.kind == DocumentKind.IMAGE }
-        "PDF para imagem", "Extrair imagens", "Juntar PDF", "Dividir PDF", "Comprimir PDF", "Proteger PDF", "Rodar páginas", "Adicionar texto", "Editar PDF", "Marca de água", "Numerar páginas", "Assinar PDF", "Reparar PDF", "Ver propriedades", "Organizar páginas", "Remover páginas", "Traduzir PDF", "Preencher formulários", "Imprimir PDF", "Partilhar PDF", "Extrair texto PDF", "Extrair páginas", "Adicionar página em branco", "Editar metadados" -> documents.filter { it.kind == DocumentKind.PDF }
+        "PDF para imagem", "Extrair imagens", "Juntar PDF", "Dividir PDF", "Comprimir PDF", "Proteger PDF", "Rodar páginas", "Adicionar texto", "Editar PDF", "Marca de água", "Numerar páginas", "Assinar PDF", "Reparar PDF", "Ver propriedades", "Organizar páginas", "Remover páginas", "Traduzir PDF", "Preencher formulários", "Imprimir PDF", "Partilhar PDF", "Extrair texto PDF", "Extrair páginas", "Adicionar página em branco", "Editar metadados", "Achatar formulários", "Remover metadados", "Relatório do PDF" -> documents.filter { it.kind == DocumentKind.PDF }
         "Converter PDF" -> documents.filter { it.kind == DocumentKind.PDF || it.extension in setOf("docx", "xlsx", "pptx", "jpg", "jpeg", "png") }
         "Criar ZIP", "Detetar duplicados" -> documents
         else -> documents
@@ -235,6 +235,19 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         "Extrair páginas" -> listOf(AdvancedPdfOperations.extractPages(context, file!!, pageOrder.split(",").mapNotNull { it.trim().toIntOrNull() }))
                         "Adicionar página em branco" -> listOf(AdvancedPdfOperations.insertBlankPage(context, file!!, pageAfter.toIntOrNull() ?: 1))
                         "Editar metadados" -> listOf(AdvancedPdfOperations.editMetadata(context, file!!, metadataTitle, metadataAuthor, metadataSubject, metadataKeywords))
+                        "Achatar formulários" -> listOf(AdvancedPdfOperations.flattenForms(context, file!!))
+                        "Remover metadados" -> listOf(AdvancedPdfOperations.removeDocumentMetadata(context, file!!))
+                        "Relatório do PDF" -> {
+                            val extracted = PdfOperations.extractText(context, file!!)
+                            val words = extracted.trim().split(Regex("\\s+")).count { it.isNotBlank() }
+                            val lines = extracted.lineSequence().count { it.isNotBlank() }
+                            outputMessage = PdfOperations.getProperties(context, file) +
+                                "\\nPalavras extraídas: " + words +
+                                "\\nLinhas de texto: " + lines +
+                                "\\nCaracteres: " + extracted.length +
+                                if (extracted.isBlank()) "\\nAviso: não foi encontrado texto selecionável; execute OCR se o documento for uma digitalização." else ""
+                            emptyList()
+                        }
                         "Extrair texto PDF" -> listOf(DocumentUtilityOperations.extractTextToFile(context, file!!))
                         "Criar ZIP" -> listOf(DocumentUtilityOperations.createZip(documents.filter { it.file.absolutePath in selectedPaths }.map { it.file }))
                         "Detetar duplicados" -> {
@@ -822,6 +835,9 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
                         }
                     }
                     "Preencher formulários" -> InfoLine(if (english) "Fill existing AcroForm text fields in the selected PDF." else "Preencha campos AcroForm de texto existentes no PDF selecionado.", Icons.Default.EditNote)
+                    "Achatar formulários" -> InfoLine(if (english) "Convert current AcroForm field appearances into page content. The fields will no longer be editable." else "Transforme a aparência atual dos campos AcroForm em conteúdo das páginas. Os campos deixam de ser editáveis.", Icons.Default.Layers)
+                    "Remover metadados" -> InfoLine(if (english) "Create a copy without standard document information or the catalog XMP stream. Embedded object metadata may remain." else "Crie uma cópia sem as informações padrão do documento nem o fluxo XMP do catálogo. Metadados dentro de objetos incorporados podem permanecer.", Icons.Default.PrivacyTip)
+                    "Relatório do PDF" -> InfoLine(if (english) "Inspect page count, file size, extracted words, lines and characters. Image-only scans may require OCR." else "Analise o número de páginas, tamanho, palavras, linhas e caracteres extraídos. Digitalizações só com imagem podem precisar de OCR.", Icons.Default.Analytics)
                     "Organizar páginas" -> InfoLine(if (english) "Reorder PDF pages using the comma-separated page order above." else "Reordene páginas do PDF com a ordem de números separada por vírgulas acima.", Icons.Default.GridView)
                     "Remover páginas" -> InfoLine(if (english) "Remove the selected page numbers and save a new PDF." else "Remova as páginas indicadas e guarde um novo PDF.", Icons.Default.Delete)
                     else -> InfoLine(if (english) "Choose a source document to continue." else "Escolha um documento de origem para continuar.", tool.icon)
