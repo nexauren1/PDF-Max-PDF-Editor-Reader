@@ -189,7 +189,10 @@ object DocumentScanner {
      */
     fun scan(context: Context, forceRefresh: Boolean = false): List<IndexedDocument> {
         val appContext = context.applicationContext
-        if (!hasAccess(appContext)) return emptyList()
+        if (!hasAccess(appContext)) {
+            lastDiagnostic = "All-files access permission is not granted."
+            return emptyList()
+        }
 
         loadPersistent(appContext)
 
