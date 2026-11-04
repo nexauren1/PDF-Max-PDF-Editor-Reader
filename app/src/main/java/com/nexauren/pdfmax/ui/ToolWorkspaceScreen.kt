@@ -54,7 +54,7 @@ import java.io.File
 private enum class ToolFlowStage { SELECT, PROCESSING, RESULT }
 
 @Composable
-internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
+internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean, onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
@@ -681,6 +681,30 @@ internal fun ToolWorkspaceScreen(tool: ToolSpec, english: Boolean) {
     } else {
 
     Column(Modifier.fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 1.dp, end = 2.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
+                Icon(Icons.Default.ArrowBack, if (english) "Back" else "Voltar", tint = Color.White)
+            }
+            Spacer(Modifier.width(5.dp))
+            Column(Modifier.weight(1f)) {
+                Text("PDF Max", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    if (english) "DEDICATED TOOL WORKSPACE" else "ESPAÇO DE TRABALHO DA FERRAMENTA",
+                    color = MaxMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp
+                )
+            }
+            Box(
+                Modifier.clip(CircleShape)
+                    .background(tool.color.copy(alpha = 0.15f))
+                    .border(1.dp, tool.color.copy(alpha = 0.48f), CircleShape)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(if (english) "LOCAL" else "LOCAL", color = tool.color, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
+            }
+        }
         ToolIdentityPanel(tool, english)
         Spacer(Modifier.height(13.dp))
         ToolStepIndicator(flowStage, tool.color, english)
