@@ -1312,7 +1312,7 @@ private fun SideMenu(current: Page, en: Boolean, navigate: (Page) -> Unit, langu
             Text(if (en) "English" else "Português", color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
             Text("PT / EN", color = MaxMuted, fontSize = 10.sp)
         }
-        Text("PDF Max  •  v1.2.5", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
+        Text("PDF Max  •  v1.2.6", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
     }
 }
 
