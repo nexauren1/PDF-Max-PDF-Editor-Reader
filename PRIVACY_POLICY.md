@@ -4,7 +4,7 @@
 **Last updated:** 4 November 2026  
 **Public policy page:** https://nexauren1.github.io/PDF-Max-PDF-Editor-Reader/privacy-policy.html
 
-This policy is published in Portuguese and English on the public policy page above.
+The bilingual HTML page has been committed under `docs/privacy-policy.html`. The GitHub Pages address above is the intended public URL; it becomes live after GitHub Pages is enabled for this repository with **GitHub Actions** as the publishing source. Until then, the HTML file can be viewed in the repository at https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/blob/main/docs/privacy-policy.html.
 
 ## Summary
 
