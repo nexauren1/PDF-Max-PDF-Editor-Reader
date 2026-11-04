@@ -1219,7 +1219,7 @@ private fun SettingsPage(en: Boolean, changeLanguage: () -> Unit) {
         SettingRow(
             Icons.Default.Info,
             if (en) "About PDF Max" else "Sobre o PDF Max",
-            "PDF Max 1.2.5 • Android 8.0+"
+            "PDF Max 1.2.6 • Android 8.0+"
         )
         Spacer(Modifier.height(18.dp))
         Text(
