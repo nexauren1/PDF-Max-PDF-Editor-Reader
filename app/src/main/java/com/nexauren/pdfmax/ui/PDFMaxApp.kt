@@ -151,7 +151,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                     Modifier.fillMaxWidth(), screen, english,
                     { go(Page.HOME) }, { go(Page.FILES) },
                     { go(Page.CREATE_PDF) },
-                    { go(Page.TOOLS) }, { scope.launch { drawer.open() } }
+                    { go(Page.FAVORITES) }, { scope.launch { drawer.open() } }
                 )
             }
         ) { insets ->
@@ -269,41 +269,57 @@ private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) 
             }
         }
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp, vertical = 5.dp)) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 7.dp)) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
             Image(
                 painter = painterResource(R.drawable.ic_pdfmax),
                 contentDescription = "PDF Max",
-                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(13.dp))
+                modifier = Modifier.size(45.dp).clip(RoundedCornerShape(13.dp))
             )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text("PDF Max", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-                Text(if (en) "PDF EDITOR & READER" else "EDITOR E LEITOR DE PDF", color = Color(0xFF8FA9CE), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+                Text("PDF Max", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    if (en) "PDF EDITOR & READER" else "EDITOR E LEITOR DE PDF",
+                    color = Color(0xFF8FA9CE), fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp
+                )
+            }
+            Row(
+                Modifier.clip(CircleShape)
+                    .background(Color(0xFF352A0B))
+                    .border(1.dp, Color(0xFFFFD45B).copy(alpha = 0.65f), CircleShape)
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Star, null, tint = Color(0xFFFFD45B), modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("PRO", color = Color(0xFFFFD45B), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
             }
             IconButton(onClick = { navigate(Page.SETTINGS) }) {
                 Icon(Icons.Default.Settings, if (en) "Settings" else "Definições", tint = Color(0xFFB5C7E2))
             }
         }
-        Text(if (en) "Hello, welcome back" else "Olá, bem-vindo!", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
-        Text(if (en) "Manage your documents and explore your tools." else "Gira os seus documentos e explore as ferramentas.", color = MaxMuted, fontSize = 12.sp)
+
+        SearchBar(if (en) "Search files and folders…" else "Pesquisar ficheiros e pastas…") {
+            navigate(Page.FILES)
+        }
+
         if (!storageAccess) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(11.dp))
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp))
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
                     .background(Color(0xFF17304D))
-                    .border(1.dp, Color(0xFF3B638B), RoundedCornerShape(15.dp))
-                    .padding(12.dp),
+                    .border(1.dp, Color(0xFF3B638B), RoundedCornerShape(14.dp))
+                    .padding(11.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFF234C70)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.FolderSpecial, null, tint = Color(0xFF8BD6FF))
-                }
-                Spacer(Modifier.width(10.dp))
+                Icon(Icons.Default.FolderSpecial, null, tint = Color(0xFF8BD6FF), modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(if (en) "Allow document access" else "Ative o acesso aos documentos", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(if (en) "Enable document access" else "Ative o acesso aos documentos", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        if (en) "Required to find PDFs, Word and other files automatically." else "Necessário para encontrar PDFs, Word e outros ficheiros automaticamente.",
+                        if (en) "Needed to find PDFs, Word and other files on this device." else "Necessário para localizar PDFs, Word e outros ficheiros neste dispositivo.",
                         color = MaxMuted, fontSize = 9.sp, lineHeight = 13.sp
                     )
                 }
@@ -312,63 +328,69 @@ private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) 
                 }
             }
         }
-        Spacer(Modifier.height(14.dp))
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF6335C9), Color(0xFF1B66B8), Color(0xFF087E91))))
-                .border(1.dp, Color(0xFF578BFF), RoundedCornerShape(17.dp))
-                .clickable { choose(tools.first { it.title == "Criar PDF" }) }
-                .padding(15.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(Modifier.size(47.dp).clip(RoundedCornerShape(13.dp)).background(Color.White.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.EditNote, null, tint = Color.White, modifier = Modifier.size(27.dp))
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(if (en) "CREATE A PROFESSIONAL PDF" else "CRIAR UM PDF PROFISSIONAL", color = Color(0xFFDCD4FF), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Text(if (en) "Writing & layout lab" else "Laboratório de escrita e layout", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text(if (en) "Titles, styles, fonts and tables" else "Títulos, estilos, fontes e tabelas", color = Color(0xFFD5E4FF), fontSize = 10.sp)
-            }
-            Icon(Icons.Default.ArrowForward, null, tint = Color.White)
-        }
-        Spacer(Modifier.height(15.dp))
-        SearchBar(if (en) "Search files and folders…" else "Pesquisar arquivos e pastas…") { navigate(Page.FILES) }
-        Spacer(Modifier.height(15.dp))
+
+        Spacer(Modifier.height(13.dp))
         Box(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF4225A5), Color(0xFF142D75), Color(0xFF0B7197))))
-                .border(1.dp, Color(0xFF466DFF), RoundedCornerShape(20.dp)).padding(17.dp)
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(19.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF32117B), Color(0xFF123D9A), Color(0xFF075C82))))
+                .border(1.dp, Color(0xFF347DFF), RoundedCornerShape(19.dp))
+                .padding(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AutoAwesome, null, tint = Color(0xFFBFA8FF), modifier = Modifier.size(17.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(if (en) "YOUR PDF ASSISTANT" else "O SEU ASSISTENTE DE PDF", color = Color(0xFFD4C8FF), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(if (en) "Everything you need, in one place" else "Todas as ferramentas num só lugar", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (en) "YOUR COMPLETE PDF ASSISTANT" else "O SEU ASSISTENTE COMPLETO DE PDF",
+                        color = Color(0xFFC7BCFF), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        if (en) "All your PDF tools in one place" else "Todas as ferramentas num só lugar",
+                        color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold,
+                        lineHeight = 21.sp
+                    )
                     Spacer(Modifier.height(5.dp))
-                    Text(if (en) "Read, edit, convert and protect files." else "Leia, edite, converta e proteja os seus documentos.", color = Color(0xFFD6E2FF), fontSize = 11.sp)
+                    Text(
+                        if (en) "Edit, convert, protect and organise documents with one workspace." else "Edite, converta, proteja e organize os seus documentos num único espaço.",
+                        color = Color(0xFFD8E5FF), fontSize = 10.sp, lineHeight = 14.sp
+                    )
                     Spacer(Modifier.height(11.dp))
-                    Row(Modifier.clip(CircleShape).background(Color(0xFF168BFF)).clickable { navigate(Page.TOOLS) }.padding(horizontal = 13.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (en) "Explore tools" else "Explorar ferramentas", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Row(
+                        Modifier.clip(CircleShape)
+                            .background(Color(0xFF087FF1))
+                            .clickable { navigate(Page.TOOLS) }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(if (en) "Explore all tools" else "Explorar ferramentas", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.width(5.dp))
-                        Icon(Icons.Default.ArrowForward, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.ArrowForward, null, tint = Color.White, modifier = Modifier.size(13.dp))
                     }
                 }
-                Box(Modifier.size(80.dp).clip(RoundedCornerShape(22.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF9562FF), Color(0xFF167EFF)))),
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier.size(76.dp).clip(RoundedCornerShape(22.dp))
+                        .background(Brush.linearGradient(listOf(Color(0xFF9C56FF), Color(0xFF126CFF), Color(0xFF0BD4FF)))),
                     contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.PictureAsPdf, null, tint = Color.White, modifier = Modifier.size(50.dp)) }
+                ) {
+                    Icon(Icons.Default.PictureAsPdf, null, tint = Color.White, modifier = Modifier.size(49.dp))
+                }
             }
         }
-        Spacer(Modifier.height(18.dp))
-        SectionTitle(if (en) "Quick tools" else "Ferramentas rápidas", if (en) "See all" else "Ver tudo") { navigate(Page.TOOLS) }
-        ToolGrid(listOf(tools[0], tools[1], tools[2], tools[3], tools[5], tools[7]), choose, en)
-        Spacer(Modifier.height(18.dp))
-        SectionTitle(if (en) "Recent files" else "Arquivos recentes", if (en) "View all" else "Ver todos") { navigate(Page.FILES) }
+
+        Spacer(Modifier.height(17.dp))
+        SectionTitle(if (en) "Main tools" else "Ferramentas principais", if (en) "See all" else "Ver todas") {
+            navigate(Page.TOOLS)
+        }
+        ToolGrid(
+            listOf(tools[1], tools[2], tools[3], tools[4], tools[5], tools[6]),
+            choose,
+            en
+        )
+        Spacer(Modifier.height(17.dp))
+        SectionTitle(if (en) "Recent files" else "Arquivos recentes", if (en) "View all" else "Ver todos") {
+            navigate(Page.FILES)
+        }
         if (recentDocuments.isEmpty()) {
             Text(if (en) "Your recent documents will appear here after enabling the file library." else "Os documentos recentes aparecerão aqui depois de ativar a biblioteca de ficheiros.", color = MaxMuted, fontSize = 10.sp, lineHeight = 15.sp)
         } else {
@@ -1273,15 +1295,15 @@ private fun DrawerItem(icon: ImageVector, label: String, selected: Boolean, clic
 }
 
 @Composable
-private fun BottomBar(modifier: Modifier, current: Page, en: Boolean, home: () -> Unit, files: () -> Unit, add: () -> Unit, toolsClick: () -> Unit, menu: () -> Unit) {
+private fun BottomBar(modifier: Modifier, current: Page, en: Boolean, home: () -> Unit, files: () -> Unit, favoritesClick: () -> Unit, add: () -> Unit, menu: () -> Unit) {
     Row(modifier.background(Color(0xFF071329)).border(BorderStroke(1.dp, Color(0xFF1C3557))).navigationBarsPadding().height(66.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
         BottomItem(Modifier.weight(1f), Icons.Default.Home, if (en) "Home" else "Início", current == Page.HOME, home)
         BottomItem(Modifier.weight(1f), Icons.Default.FolderOpen, if (en) "Files" else "Arquivos", current == Page.FILES, files)
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(48.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF20B7FF), Color(0xFF275DFF)))).clickable(onClick = add), contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(29.dp)) }
+            Box(Modifier.size(48.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF20B7FF), Color(0xFF8E36FF), Color(0xFF275DFF)))).border(1.dp, Color(0xFF67D9FF), CircleShape).clickable(onClick = add), contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(29.dp)) }
         }
-        BottomItem(Modifier.weight(1f), Icons.Default.GridView, if (en) "Tools" else "Ferramentas", current == Page.TOOLS, toolsClick)
-        BottomItem(Modifier.weight(1f), Icons.Default.Menu, "Menu", false, menu)
+        BottomItem(Modifier.weight(1f), Icons.Default.Star, if (en) "Favorites" else "Favoritos", current == Page.FAVORITES, favoritesClick)
+        BottomItem(Modifier.weight(1f), Icons.Default.Menu, if (en) "More" else "Mais", false, menu)
     }
 }
 
