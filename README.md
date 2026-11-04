@@ -73,8 +73,10 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 
 ## Privacy policy
 
-- Public bilingual policy page: https://nexauren1.github.io/PDF-Max-PDF-Editor-Reader/privacy-policy.html
+- GitHub Pages URL (after enabling Pages with GitHub Actions): https://nexauren1.github.io/PDF-Max-PDF-Editor-Reader/privacy-policy.html
+- HTML page in the repository: [docs/privacy-policy.html](docs/privacy-policy.html)
 - Source policy: [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
+- Deployment workflow: [pages.yml](.github/workflows/pages.yml). In Settings → Pages, choose **GitHub Actions** as the publishing source, then run the workflow.
 
 ## Google Play policy note
 
