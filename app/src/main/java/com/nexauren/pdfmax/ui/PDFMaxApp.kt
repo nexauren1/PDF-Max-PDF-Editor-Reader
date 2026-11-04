@@ -764,6 +764,9 @@ private fun ReaderPage(
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 15.dp, vertical = 7.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = openPdf) {
+                Icon(Icons.Default.ArrowBack, if (en) "Back to files" else "Voltar aos ficheiros", tint = Color.White)
+            }
             Column(Modifier.weight(1f)) {
                 Text(fileName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
@@ -771,10 +774,21 @@ private fun ReaderPage(
                     color = MaxMuted, fontSize = 10.sp
                 )
             }
-            IconButton(onClick = openPdf) { Icon(Icons.Default.FolderOpen, null, tint = MaxCyan) }
+            IconButton(onClick = { toggleBookmark() }) {
+                Icon(
+                    if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                    if (en) "Bookmark page" else "Marcar página",
+                    tint = if (isBookmarked) MaxCyan else MaxMuted
+                )
+            }
             Box {
                 IconButton(onClick = { showMore = true }) { Icon(Icons.Default.MoreVert, null, tint = MaxText) }
                 DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
+                    DropdownMenuItem(
+                        text = { Text(if (en) "Open another PDF" else "Abrir outro PDF") },
+                        leadingIcon = { Icon(Icons.Default.FolderOpen, null) },
+                        onClick = { showMore = false; openPdf() }
+                    )
                     DropdownMenuItem(
                         text = { Text(if (en) "Share PDF" else "Partilhar PDF") },
                         leadingIcon = { Icon(Icons.Default.Share, null) },
