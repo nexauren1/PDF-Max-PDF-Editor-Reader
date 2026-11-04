@@ -133,3 +133,4 @@ object OfficeExportOperations {
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
         .replace("'", "&apos;")
+}

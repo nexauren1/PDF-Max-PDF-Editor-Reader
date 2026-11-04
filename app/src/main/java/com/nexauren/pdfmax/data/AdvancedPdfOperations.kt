@@ -307,3 +307,4 @@ object AdvancedPdfOperations {
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
         .replace("'", "&apos;")
+}

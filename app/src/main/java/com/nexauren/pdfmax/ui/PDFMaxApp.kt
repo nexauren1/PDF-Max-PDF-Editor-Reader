@@ -201,10 +201,11 @@ private fun TopBar(screen: Page, english: Boolean, onMenu: () -> Unit, onBack: (
         IconButton(onClick = if (root) onMenu else onBack) {
             Icon(if (root) Icons.Default.Menu else Icons.Default.ArrowBack, null, tint = Color.White)
         }
-        Box(Modifier.size(36.dp).clip(RoundedCornerShape(11.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFFFF3469), Color(0xFF754CFF), Color(0xFF128DFF)))),
-            contentAlignment = Alignment.Center
-        ) { Icon(Icons.Default.PictureAsPdf, null, tint = Color.White, modifier = Modifier.size(23.dp)) }
+        Image(
+            painter = painterResource(R.drawable.ic_pdfmax),
+            contentDescription = "PDF Max",
+            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp))
+        )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text("PDF Max", fontSize = 18.sp, color = Color.White, fontWeight = FontWeight.Bold)
@@ -1157,7 +1158,7 @@ private fun SettingsPage(en: Boolean, changeLanguage: () -> Unit) {
         SettingRow(
             Icons.Default.Info,
             if (en) "About PDF Max" else "Sobre o PDF Max",
-            "PDF Max 1.2.4 • Android 8.0+"
+            "PDF Max 1.2.5 • Android 8.0+"
         )
         Spacer(Modifier.height(18.dp))
         Text(
@@ -1218,7 +1219,11 @@ private fun ToolDetailPage(tool: ToolSpec, en: Boolean, openPdf: () -> Unit) {
 private fun SideMenu(current: Page, en: Boolean, navigate: (Page) -> Unit, language: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 15.dp, vertical = 20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(43.dp).clip(RoundedCornerShape(13.dp)).background(Brush.linearGradient(listOf(Color(0xFFFF3475), Color(0xFF6E4BFF), Color(0xFF128CFF)))), contentAlignment = Alignment.Center) { Icon(Icons.Default.PictureAsPdf, null, tint = Color.White, modifier = Modifier.size(29.dp)) }
+            Image(
+                painter = painterResource(R.drawable.ic_pdfmax),
+                contentDescription = "PDF Max",
+                modifier = Modifier.size(43.dp).clip(RoundedCornerShape(13.dp))
+            )
             Spacer(Modifier.width(10.dp))
             Column {
                 Text("PDF Max", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -1246,7 +1251,7 @@ private fun SideMenu(current: Page, en: Boolean, navigate: (Page) -> Unit, langu
             Text(if (en) "English" else "Português", color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
             Text("PT / EN", color = MaxMuted, fontSize = 10.sp)
         }
-        Text("PDF Max  •  v1.2.4", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
+        Text("PDF Max  •  v1.2.5", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
     }
 }
 
