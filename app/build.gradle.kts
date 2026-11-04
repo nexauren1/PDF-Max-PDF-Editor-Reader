@@ -10,8 +10,8 @@ android {
         applicationId = "com.nexauren.pdfmax"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.2.5"
+        versionCode = 11
+        versionName = "1.2.6"
     }
     // Android App Bundles are automatically split by device ABI by Google Play.
     buildFeatures { compose = true }
