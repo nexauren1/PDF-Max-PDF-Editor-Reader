@@ -94,21 +94,20 @@ jobs:
           retention-days: 30
 
       - name: Publish stable GitHub release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PUBLISH_STABLE_RELEASE == 'true'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish v1.2.6-rc1]')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.6
-          name: "PDF Max v1.2.6"
+          tag_name: v1.2.6-rc1
+          name: "PDF Max v1.2.6 Release Candidate 1"
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
-          prerelease: false
-          make_latest: true
+          prerelease: true
+          make_latest: false
           files: |
             app-release-verified.apk
             app-release-verified.aab
           body: |
-            PDF Max v1.2.6 stable GitHub release.
-            Includes a signed universal APK for direct device testing and a signed AAB for Google Play submission.
-            The app bundle lets Google Play deliver only the matching native libraries to each device.
-            The release workflow validates the private upload keystore before compiling; it does not fall back to a debug signature.
-            Google Play approval, store listing, data-safety declarations and the All files access permission review remain separate steps.
+            PDF Max v1.2.6 Release Candidate 1.
+            Automated unit tests, Android debug/release builds, upload-keystore validation and APK/AAB signature checks passed.
+            Includes a signed universal APK for direct Android 13 device testing and a signed AAB for a later Google Play submission.
+            This is a pre-release candidate, not a device-certified stable release. Physical-device regression testing, privacy review for All files access and store-policy approval remain outstanding.
