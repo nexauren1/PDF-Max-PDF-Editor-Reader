@@ -1,55 +1,46 @@
 # PDF Max – Privacy Policy
 
-**Last updated: 3 November 2026**
+**Version:** 1.2.6 (versionCode 11)  
+**Last updated:** 4 November 2026  
+**Public policy page:** https://nexauren1.github.io/PDF-Max-PDF-Editor-Reader/privacy-policy.html
 
-PDF Max is an Android PDF reader and document-management/editor application. This policy explains how the app accesses and handles information on your device.
+This policy is published in Portuguese and English on the public policy page above.
 
-## Files and folders
+## Summary
 
-PDF Max uses Android's **All files access** permission (`MANAGE_EXTERNAL_STORAGE`) to find supported documents in shared device storage, display its internal document library, and let you run document operations without selecting every source file in a separate file-picker app. The app reads and writes files only as needed for the document features you choose. Original documents are not automatically deleted.
+PDF Max is an Android document utility. Normal PDF operations, the document index, local preferences, camera capture and ML Kit OCR/translation processing are designed to run on the device. The developer does not operate an account system, cloud document storage, advertising SDK, developer analytics SDK or document-upload service.
 
-Generated files are saved in **Documents/PDF Max**. During an operation, PDF Max may create temporary working copies in its private app cache so you can review a result before saving it. Shared copies for Android's share sheet are also prepared in the private cache. These temporary files stay on the device; the app removes review copies after a successful save or when you discard the pending operation, and Android may clear cache data at any time.
+## Permissions
 
-The library index (file names, paths, sizes and modification times), favourites, recently opened paths, reversible in-app trash entries and reader bookmarks are stored in the app's private preferences so the library can be restored between sessions. The in-app trash only hides an entry inside PDF Max; it does not delete or move the source document. This information is not a cloud backup. You can clear the app's data or uninstall PDF Max to remove its private index, preferences and cache; files saved in shared Documents storage remain until you delete them.
+- **All files access** (`MANAGE_EXTERNAL_STORAGE`): used to discover supported documents in shared storage and provide the app's internal library and document tools. This is broad access to shared storage, not access limited to one user-selected file.
+- **Read external storage** (up to Android 12L): used on older Android versions for the document library.
+- **Camera**: requested only when the user starts the in-app document capture feature.
+- **Internet / network state**: used by Google Play services and ML Kit for language-model downloads and related service/diagnostic communication, and when opening external support or information links.
 
-## Camera and OCR
+## Information stored locally
 
-The camera permission is used only when you choose the in-app document capture feature. Captured images and OCR are processed on the device using the Android camera and ML Kit components. Captured scans are saved locally in the PDF Max output folder.
+The app stores a local index (file names, paths, extensions, sizes and modification dates), favourites, recently opened paths, in-app Trash entries, reader bookmarks, language preference and temporary operation/share files in private app storage. These are not uploaded to a PDF Max account. The in-app Trash only hides a library item; it does not delete the original file.
 
-## Translation
+Generated documents are saved in `Documents/PDF Max`; camera scans are saved in `Documents/PDF Max/Scans`. Temporary review copies are kept in the app cache and removed when possible after saving or discarding. Android may clear cache data. Clearing app data or uninstalling removes the private index, preferences and cache, but exported files in shared Documents storage remain until the user deletes them.
 
-When you choose PDF translation, PDF Max uses Google Translate through Google ML Kit's on-device translation models. The first use of a language pair downloads the required language models through Google Play services; translated document text is processed on the device. Scanned PDFs need OCR before text can be translated. Translations are automatic and can be inaccurate; review important content. Learn more at https://translate.google.com.
+## Local processing and Google ML Kit
+
+PDF reading and editing operations run locally. Camera images and OCR are processed on-device. PDF translation uses on-device ML Kit translation models; the current implementation requests language-model downloads over Wi-Fi through Google Play services. The document text used by OCR/translation is processed on the device and is not sent to servers operated by the developer.
+
+Google's ML Kit Android SDKs collect technical diagnostics and usage metrics. Google's disclosure says these can include device manufacturer/model and Android version/build, app package/version, device or per-installation identifiers, performance/latency metrics, API configuration, input/output size, feature version, event types and error codes. The Translate feature may also collect configured source/target languages and use Firebase remote-configuration/installation diagnostics. Google states that the listed data is encrypted in transit using HTTPS and is not transferred by Google to third parties. See [Google ML Kit Android data disclosure](https://developers.google.com/ml-kit/android-data-disclosure), [ML Kit terms](https://developers.google.com/ml-kit/terms) and [Google Privacy Policy](https://policies.google.com/privacy).
 
 ## Sharing and printing
 
-Sharing or printing starts only after you choose the corresponding action. Android's system share sheet or print service then handles the file and any recipient or printer you select. Those services are subject to their own privacy policies.
+Sharing and printing start only after the user chooses the action. Android's share sheet or print service then handles the file and the selected recipient, app or printer under that service's own privacy policy.
 
-## Network, analytics and advertising
+## Developer collection and contact
 
-The Internet permission is used for required model downloads and related Google Play services communication. The current app build does not include a developer-operated account system, advertising SDK, analytics SDK or document-upload service. PDF Max does not send document contents to servers operated by the developer.
+The current app build does not include a developer-operated account system, ads SDK, developer analytics SDK or document-upload service. The developer does not receive documents, the file index, favourites, recents, in-app Trash entries, bookmarks or language preference through the app. The app does not request location, contacts, microphone or SMS permissions. These statements do not exclude the ML Kit technical diagnostics described above.
 
-## ML Kit diagnostics and usage metrics
+For privacy questions, use the [PDF Max GitHub support page](https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/issues). GitHub issues may be public; do not post private documents, passwords or other sensitive information in a public issue.
 
-PDF Max uses Google ML Kit for on-device text recognition and translation. The document text, scan images and translated output are processed on the device and are not sent to Google servers as part of the ML Kit processing itself. However, Google states that its ML Kit Android SDKs collect technical information for diagnostics and usage analytics. This can include device manufacturer/model and Android version, app package/version, per-installation or device identifiers, performance and latency metrics, API configuration, feature input/output size, feature version, event types and error codes. Google says these metrics are encrypted in transit and are not shared with third parties. See Google's [ML Kit Android data disclosure](https://developers.google.com/ml-kit/android-data-disclosure) and [ML Kit terms and privacy](https://developers.google.com/ml-kit/terms).
+**Developer:** Nexauren · PDF Max
 
-The first use of on-device translation may also download language models through Google Play services. Google Play services and ML Kit may process technical download and diagnostic information under Google's terms and privacy policy.
+---
 
-## Information collected by the developer
-
-The current app build does not ask you to create an account and the developer does not receive your name, email address, precise location, contacts, private file index, favourites, recent-file list, in-app trash list or reader bookmarks. This statement does not exclude the third-party ML Kit diagnostics described above; account for those SDK transmissions in the Google Play Data safety form.
-
-## Data security and control
-
-Use your device's screen lock and keep Android up to date. You control which documents you open, edit, share, print or delete. Uninstalling the app removes its private app data; it does not remove exported documents from shared storage.
-
-## Children's privacy
-
-PDF Max is a general-purpose document utility and does not knowingly collect personal information from children.
-
-## Changes and contact
-
-This policy may be updated when app functionality or legal requirements change. The current version will be published with the app's source repository.
-
-For privacy questions or requests, contact the developer through the [PDF Max GitHub support page](https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/issues). Please do not attach private documents or sensitive personal information to a public issue.
-
-**Developer:** PDF Max / Nexauren
+The HTML page contains the complete policy in Portuguese and English.
