@@ -13,6 +13,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,6 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.nexauren.pdfmax.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nexauren.pdfmax.ui.theme.*
@@ -56,14 +59,14 @@ internal data class ToolSpec(val title: String, val subtitle: String, val icon: 
 
 private val tools = listOf(
     ToolSpec("Criar PDF", "Laboratório de escrita e layout", Icons.Default.Description, Color(0xFFE65A82), Page.CREATE_PDF),
-    ToolSpec("Editar PDF", "Sobreposição de texto em páginas PDF", Icons.Default.Edit, Color(0xFF9257FF), Page.EDITOR),
-    ToolSpec("Converter PDF", "Word, Excel e imagem", Icons.Default.SwapHoriz, Color(0xFF13B8A6), Page.CONVERTER),
-    ToolSpec("Comprimir PDF", "Regravar e otimizar; tamanho pode variar", Icons.Default.Compress, Color(0xFF08A9DB)),
-    ToolSpec("Juntar PDF", "Combinar documentos", Icons.Default.MergeType, Color(0xFFFF8A35)),
-    ToolSpec("Dividir PDF", "Separar por páginas", Icons.Default.CallSplit, Color(0xFF4285F4)),
-    ToolSpec("Proteger PDF", "Senha e permissões", Icons.Default.Security, Color(0xFFE84B70), Page.PROTECT),
+    ToolSpec("Editar PDF", "Sobreposição de texto em páginas PDF", Icons.Default.Edit, Color(0xFFFF3D79), Page.EDITOR),
+    ToolSpec("Converter PDF", "Word, Excel e imagem", Icons.Default.SwapHoriz, Color(0xFF2675FF), Page.CONVERTER),
+    ToolSpec("Comprimir PDF", "Regravar e otimizar; tamanho pode variar", Icons.Default.Compress, Color(0xFF18A96B)),
+    ToolSpec("Juntar PDF", "Combinar documentos", Icons.Default.MergeType, Color(0xFF9B4DFF)),
+    ToolSpec("Dividir PDF", "Separar por páginas", Icons.Default.CallSplit, Color(0xFFFF922E)),
+    ToolSpec("Proteger PDF", "Encriptação AES e palavra-passe de abertura", Icons.Default.Security, Color(0xFF11AFC0), Page.PROTECT),
     ToolSpec("Assinar PDF", "Assinatura manuscrita visual", Icons.Default.Draw, Color(0xFF9A59FF)),
-    ToolSpec("Digitalizar e OCR", "Documento para PDF", Icons.Default.QrCodeScanner, Color(0xFF13B7D0), Page.SCANNER),
+    ToolSpec("Digitalizar e OCR", "Documento para PDF", Icons.Default.QrCodeScanner, Color(0xFF2ABF78), Page.SCANNER),
     ToolSpec("Extrair imagens", "Guardar imagens", Icons.Default.Image, Color(0xFF18A5E8)),
     ToolSpec("Adicionar texto", "Inserir texto", Icons.Default.TextFields, Color(0xFF17B7D3), Page.EDITOR),
     ToolSpec("Marca de água", "Texto ou imagem", Icons.Default.WaterDrop, Color(0xFF527DFF)),
@@ -233,12 +236,15 @@ private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) 
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                val newlyGranted = !storageAccess && DocumentScanner.hasAccess(context)
                 val granted = DocumentScanner.hasAccess(context)
                 storageAccess = granted
                 if (granted) {
                     scope.launch {
                         recentDocuments = withContext(Dispatchers.IO) {
-                            DocumentScanner.scan(context, forceRefresh = true)
+                            // A full reconciliation is needed only on the first grant.
+                            // Normal resumes reuse the cached index and incremental refresh.
+                            DocumentScanner.scan(context, forceRefresh = newlyGranted)
                         }.take(5)
                     }
                 }
@@ -263,6 +269,21 @@ private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) 
         }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp, vertical = 5.dp)) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = painterResource(R.drawable.ic_pdfmax),
+                contentDescription = "PDF Max",
+                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(13.dp))
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("PDF Max", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                Text(if (en) "PDF EDITOR & READER" else "EDITOR E LEITOR DE PDF", color = Color(0xFF8FA9CE), fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+            }
+            IconButton(onClick = { navigate(Page.SETTINGS) }) {
+                Icon(Icons.Default.Settings, if (en) "Settings" else "Definições", tint = Color(0xFFB5C7E2))
+            }
+        }
         Text(if (en) "Hello, welcome back" else "Olá, bem-vindo!", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
         Text(if (en) "Manage your documents and explore your tools." else "Gira os seus documentos e explore as ferramentas.", color = MaxMuted, fontSize = 12.sp)
         if (!storageAccess) {

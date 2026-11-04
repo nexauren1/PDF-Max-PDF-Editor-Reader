@@ -24,6 +24,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
 import java.io.FileOutputStream
+import java.security.SecureRandom
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -36,7 +37,32 @@ object PdfOperations {
 
     private fun output(input: File, suffix: String, extension: String = "pdf"): File {
         val base = input.nameWithoutExtension.replace(Regex("[^A-Za-z0-9_-]"), "_")
-        return File(outputDirectory(), base + "_" + suffix + "." + extension)
+        val directory = outputDirectory()
+        val first = File(directory, base + "_" + suffix + "." + extension)
+        if (!first.exists()) return first
+        var attempt = 2
+        var candidate: File
+        do {
+            candidate = File(directory, base + "_" + suffix + "_" + System.currentTimeMillis() + "_" + attempt + "." + extension)
+            attempt++
+        } while (candidate.exists())
+        return candidate
+    }
+
+    /** Decodes large camera/gallery images at a safe working resolution for PDF pages. */
+    fun decodeImageForPdf(imageFile: File, maxDimension: Int = 2560): Bitmap {
+        require(imageFile.isFile && imageFile.canRead()) { "Não foi possível ler " + imageFile.name + "." }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(imageFile.absolutePath, bounds)
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "O ficheiro de imagem não é válido." }
+        var sample = 1
+        while (maxOf(bounds.outWidth / sample, bounds.outHeight / sample) > maxDimension) sample *= 2
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        return BitmapFactory.decodeFile(imageFile.absolutePath, options)
+            ?: error("Não foi possível descodificar a imagem.")
     }
 
     private fun init(context: Context) = PDFBoxResourceLoader.init(context.applicationContext)
@@ -44,20 +70,22 @@ object PdfOperations {
     fun merge(context: Context, inputs: List<File>): File {
         require(inputs.size >= 2) { "Selecione pelo menos dois PDFs." }
         init(context)
-        val target = File(outputDirectory(), "PDF_Max_Merged_" + System.currentTimeMillis() + ".pdf")
+        val target = File(outputDirectory(), "PDF_Max_Merged_" + System.currentTimeMillis() + "_" + System.nanoTime() + ".pdf")
         val merger = PDFMergerUtility()
         inputs.forEach { require(it.extension.equals("pdf", true)); merger.addSource(it) }
         merger.destinationFileName = target.absolutePath
-        merger.mergeDocuments(MemoryUsageSetting.setupMainMemoryOnly())
+        merger.mergeDocuments(MemoryUsageSetting.setupTempFileOnly())
         return target
     }
 
     fun split(context: Context, input: File, firstPage: Int, lastPage: Int): List<File> {
         init(context)
-        PDDocument.load(input).use { source ->
-            val start = (firstPage - 1).coerceAtLeast(0)
-            val end = (lastPage - 1).coerceAtMost(source.numberOfPages - 1)
-            require(start <= end && start < source.numberOfPages) { "Intervalo de páginas inválido." }
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { source ->
+            require(firstPage >= 1 && lastPage >= firstPage && lastPage <= source.numberOfPages) {
+                "O intervalo deve estar entre 1 e " + source.numberOfPages + "."
+            }
+            val start = firstPage - 1
+            val end = lastPage - 1
             return (start..end).map { index ->
                 PDDocument().use { one ->
                     one.importPage(source.getPage(index))
@@ -73,7 +101,7 @@ object PdfOperations {
         init(context)
         require(degrees in listOf(90, 180, 270))
         val target = output(input, "rotated")
-        PDDocument.load(input).use { doc ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { doc ->
             for (page in doc.pages) page.rotation = (page.rotation + degrees) % 360
             doc.save(target)
         }
@@ -84,7 +112,7 @@ object PdfOperations {
         init(context)
         require(text.isNotBlank() || numbering) { "Escreva o texto que deseja adicionar." }
         val target = output(input, if (watermark) "watermark" else if (numbering) "numbered" else "edited")
-        PDDocument.load(input).use { doc ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { doc ->
             val pageCount = doc.numberOfPages
             for (index in 0 until pageCount) {
                 val page = doc.getPage(index)
@@ -94,7 +122,7 @@ object PdfOperations {
                     stream.setNonStrokingColor(40, 120, 220)
                     val label = when {
                         numbering -> (index + 1).toString() + " / " + pageCount
-                        else -> text
+                        else -> text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
                     }
                     stream.newLineAtOffset(if (watermark) page.mediaBox.width / 2f - 90f else 42f, if (watermark) page.mediaBox.height / 2f else 42f)
                     stream.showText(latin(label).take(180))
@@ -108,11 +136,14 @@ object PdfOperations {
 
     fun protect(context: Context, input: File, password: String): File {
         init(context)
-        require(password.length >= 4) { "A senha deve ter pelo menos 4 caracteres." }
+        require(password.length >= 8) { "A senha deve ter pelo menos 8 caracteres." }
         val target = output(input, "protected")
-        PDDocument.load(input).use { doc ->
-            val policy = StandardProtectionPolicy(password, password, AccessPermission())
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { doc ->
+            val ownerPassword = ByteArray(32).also { SecureRandom().nextBytes(it) }
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            val policy = StandardProtectionPolicy(ownerPassword, password, AccessPermission())
             policy.encryptionKeyLength = 128
+            policy.setPreferAES(true)
             doc.protect(policy)
             doc.save(target)
         }
@@ -122,34 +153,37 @@ object PdfOperations {
     fun compress(context: Context, input: File): File {
         init(context)
         val target = output(input, "optimized")
-        PDDocument.load(input).use { it.save(target) }
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { it.save(target) }
         return target
     }
 
     fun repair(context: Context, input: File): File {
         init(context)
         val target = output(input, "repaired")
-        PDDocument.load(input).use { it.save(target) }
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { it.save(target) }
         return target
     }
 
     fun imageToPdf(context: Context, image: File): File {
         init(context)
-        val target = File(outputDirectory(), image.nameWithoutExtension + "_PDF_Max.pdf")
-        val bitmap = BitmapFactory.decodeFile(image.absolutePath) ?: error("Não foi possível abrir a imagem.")
-        PDDocument().use { doc ->
-            val page = PDPage(PDRectangle.A4)
-            doc.addPage(page)
-            val imageObject = LosslessFactory.createFromImage(doc, bitmap)
-            val pageW = page.mediaBox.width
-            val pageH = page.mediaBox.height
-            val scale = minOf((pageW - 48f) / bitmap.width, (pageH - 48f) / bitmap.height)
-            val width = bitmap.width * scale
-            val height = bitmap.height * scale
-            PDPageContentStream(doc, page).use { it.drawImage(imageObject, (pageW - width) / 2f, (pageH - height) / 2f, width, height) }
-            doc.save(target)
+        val target = output(image, "converted_to_pdf")
+        val bitmap = decodeImageForPdf(image)
+        try {
+            PDDocument().use { doc ->
+                val page = PDPage(PDRectangle.A4)
+                doc.addPage(page)
+                val imageObject = LosslessFactory.createFromImage(doc, bitmap)
+                val pageW = page.mediaBox.width
+                val pageH = page.mediaBox.height
+                val scale = minOf((pageW - 48f) / bitmap.width, (pageH - 48f) / bitmap.height)
+                val width = bitmap.width * scale
+                val height = bitmap.height * scale
+                PDPageContentStream(doc, page).use { it.drawImage(imageObject, (pageW - width) / 2f, (pageH - height) / 2f, width, height) }
+                doc.save(target)
+            }
+        } finally {
+            bitmap.recycle()
         }
-        bitmap.recycle()
         return target
     }
 
@@ -177,16 +211,21 @@ object PdfOperations {
     fun extractImages(context: Context, input: File): List<File> {
         init(context)
         val results = mutableListOf<File>()
-        PDDocument.load(input).use { doc ->
+        PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { doc ->
             for (pageIndex in 0 until doc.numberOfPages) {
                 val resources = doc.getPage(pageIndex).resources
                 for (name in resources.xObjectNames) {
                     val xObject = runCatching { resources.getXObject(name) }.getOrNull()
                     if (xObject is PDImageXObject) {
                         val bitmap = xObject.image
-                        val file = File(outputDirectory(), input.nameWithoutExtension + "_image_" + (pageIndex + 1) + "_" + (results.size + 1) + ".png")
-                        FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                        results.add(file)
+                        val file = output(input, "image_" + (pageIndex + 1) + "_" + (results.size + 1), "png")
+                        try {
+                            val written = FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                            check(written) { "Não foi possível guardar a imagem extraída." }
+                            results.add(file)
+                        } finally {
+                            bitmap.recycle()
+                        }
                     }
                 }
             }
@@ -196,7 +235,7 @@ object PdfOperations {
 
     fun extractText(context: Context, input: File): String {
         init(context)
-        return PDDocument.load(input).use { PDFTextStripper().getText(it) }
+        return PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { PDFTextStripper().getText(it) }
     }
 
     fun compare(context: Context, first: File, second: File): String {
@@ -221,6 +260,7 @@ object PdfOperations {
 
     fun pdfToDocx(context: Context, input: File): File {
         val text = extractText(context, input)
+        require(text.isNotBlank()) { "Não foi encontrado texto selecionável no PDF. Execute OCR se for uma digitalização." }
         val target = output(input, "converted", "docx")
         writeDocx(target, text)
         return target
@@ -228,7 +268,8 @@ object PdfOperations {
 
     fun createPdfFromText(context: Context, title: String, text: String): File {
         init(context)
-        val target = File(outputDirectory(), title.replace(Regex("[^A-Za-z0-9_-]"), "_") + "_PDF_Max.pdf")
+        val safeTitle = title.replace(Regex("[^A-Za-z0-9_-]"), "_").take(80).ifBlank { "Documento" }
+        val target = File(outputDirectory(), safeTitle + "_PDF_Max_" + System.currentTimeMillis() + "_" + System.nanoTime() + ".pdf")
         PDDocument().use { doc ->
             var page = PDPage(PDRectangle.A4)
             doc.addPage(page)
@@ -286,7 +327,7 @@ object PdfOperations {
 
     fun getProperties(context: Context, input: File): String {
         init(context)
-        return PDDocument.load(input).use { doc ->
+        return PDDocument.load(input, MemoryUsageSetting.setupTempFileOnly()).use { doc ->
             val info = doc.documentInformation
             "Ficheiro: " + input.name + "\nPáginas: " + doc.numberOfPages +
                 "\nTamanho: " + input.length() + " bytes\nTítulo: " + (info.title ?: "—") +
@@ -310,7 +351,10 @@ object PdfOperations {
         }
     }
 
-    private fun xmlEscape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    private fun xmlEscape(value: String) = value.filter {
+        it == '\t' || it == '\n' || it == '\r' ||
+            (it.code >= 0x20 && it.code != 0xFFFE && it.code != 0xFFFF)
+    }.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     private fun latin(value: String): String {
         val windows1252Extras = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ"
         return value.map { character ->

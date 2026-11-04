@@ -8,7 +8,9 @@ PDF Max is an Android PDF reader and document-management/editor application. Thi
 
 PDF Max uses Android's **All files access** permission (`MANAGE_EXTERNAL_STORAGE`) to find supported documents in shared device storage, display its internal document library, and let you run document operations without selecting every source file in a separate file-picker app. The app reads and writes files only as needed for the document features you choose. Original documents are not automatically deleted.
 
-Generated files are saved in **Documents/PDF Max**. The library index (file names, paths, sizes and modification times), favourites, recently opened paths, reversible in-app trash entries and reader bookmarks are stored in the app's private preferences so the library can be restored between sessions. The in-app trash only hides an entry inside PDF Max; it does not delete or move the source document. This information is not a cloud backup. You can clear the app's data or uninstall PDF Max to remove its private index and preferences; files saved in shared Documents storage remain until you delete them.
+Generated files are saved in **Documents/PDF Max**. During an operation, PDF Max may create temporary working copies in its private app cache so you can review a result before saving it. Shared copies for Android's share sheet are also prepared in the private cache. These temporary files stay on the device; the app removes review copies after a successful save or when you discard the pending operation, and Android may clear cache data at any time.
+
+The library index (file names, paths, sizes and modification times), favourites, recently opened paths, reversible in-app trash entries and reader bookmarks are stored in the app's private preferences so the library can be restored between sessions. The in-app trash only hides an entry inside PDF Max; it does not delete or move the source document. This information is not a cloud backup. You can clear the app's data or uninstall PDF Max to remove its private index, preferences and cache; files saved in shared Documents storage remain until you delete them.
 
 ## Camera and OCR
 

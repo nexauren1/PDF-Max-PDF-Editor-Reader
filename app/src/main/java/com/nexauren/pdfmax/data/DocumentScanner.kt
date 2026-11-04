@@ -116,7 +116,15 @@ object DocumentScanner {
     fun cachedDocuments(): List<IndexedDocument> = if (cacheReady) cachedFiles else emptyList()
 
     /** Explains what the last discovery pass actually checked, without exposing file names. */
-    fun lastScanDiagnostic(english: Boolean): String = lastDiagnostic
+    fun lastScanDiagnostic(english: Boolean): String = when {
+        lastDiagnostic.startsWith("No scan has run") -> if (english) lastDiagnostic else "Ainda não foi executada nenhuma pesquisa."
+        lastDiagnostic.startsWith("Scan failed:") -> if (english) lastDiagnostic else lastDiagnostic.removePrefix("Scan failed:").let { "Falha ao pesquisar: " + it.trim() }
+        lastDiagnostic.startsWith("Scan completed") -> if (english) lastDiagnostic else "Pesquisa concluída. " + lastDiagnostic.substringAfter("|")
+        lastDiagnostic.startsWith("Using the saved index:") -> if (english) lastDiagnostic else "A utilizar o índice guardado: " + lastDiagnostic.substringAfter(":")
+        lastDiagnostic.startsWith("Full storage scan started") -> if (english) lastDiagnostic else "Pesquisa completa do armazenamento iniciada."
+        lastDiagnostic.startsWith("Storage scan started") -> if (english) lastDiagnostic else "Pesquisa do armazenamento iniciada."
+        else -> lastDiagnostic
+    }
 
     /**
      * Restores the last saved index. Call this on Dispatchers.IO before starting
@@ -181,7 +189,10 @@ object DocumentScanner {
      */
     fun scan(context: Context, forceRefresh: Boolean = false): List<IndexedDocument> {
         val appContext = context.applicationContext
-        if (!hasAccess(appContext)) return emptyList()
+        if (!hasAccess(appContext)) {
+            lastDiagnostic = "All-files access permission is not granted."
+            return emptyList()
+        }
 
         loadPersistent(appContext)
 
@@ -271,7 +282,7 @@ object DocumentScanner {
             }
 
             val result = found.values.sortedByDescending { it.modified }
-            if (mediaStoreWorked && result.isEmpty() && cachedFiles.isNotEmpty()) {
+            if (mediaStoreWorked && result.isEmpty() && cachedFiles.isNotEmpty() && (!fullScan || folderStats.rootsFound == 0 || folderStats.inaccessibleDirectories > 0 || folderStats.timedOut)) {
                 cachedAt = now
                 return cachedFiles
             }

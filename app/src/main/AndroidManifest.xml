@@ -8,6 +8,7 @@
     <application android:requestLegacyExternalStorage="true"
         android:allowBackup="false"
         android:icon="@drawable/ic_pdfmax"
+        android:roundIcon="@drawable/ic_pdfmax"
         android:label="PDF Max"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">

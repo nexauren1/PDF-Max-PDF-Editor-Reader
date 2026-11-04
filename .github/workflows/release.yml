@@ -6,7 +6,7 @@ on:
       tag_name:
         description: "Release tag, for example v1.0.0"
         required: true
-        default: "v1.2.4"
+        default: "v1.2.5"
         type: string
 
 permissions:
@@ -14,6 +14,7 @@ permissions:
 
 jobs:
   release:
+    if: vars.PUBLISH_STABLE_RELEASE == 'true'
     runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ github.event.inputs.tag_name || github.ref_name }}
@@ -65,26 +66,37 @@ jobs:
           test -n "$ANDROID_KEYSTORE_PASSWORD"
           test -n "$ANDROID_KEY_ALIAS"
           test -n "$ANDROID_KEY_PASSWORD"
-          gradle assembleRelease bundleRelease
+          gradle testDebugUnitTest assembleRelease bundleRelease
 
-      - name: Verify and rename optimized release packages
+      - name: Verify signed release packages and report sizes
         run: |
-          test -s app/build/outputs/apk/release/app-release.apk
-          test -s app/build/outputs/bundle/release/app-release.aab
-          cp app/build/outputs/apk/release/app-release.apk "PDF-Max-$RELEASE_TAG.apk"
-          cp app/build/outputs/bundle/release/app-release.aab "PDF-Max-$RELEASE_TAG.aab"
-          du -h PDF-Max-$RELEASE_TAG.apk PDF-Max-$RELEASE_TAG.aab
-
+          set -euo pipefail
+          APK_PATH="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          AAB_PATH="$(find app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' -print -quit)"
+          test -n "$APK_PATH" && test -s "$APK_PATH"
+          test -n "$AAB_PATH" && test -s "$AAB_PATH"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK_PATH"
+          BADGING="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK_PATH")"
+          printf '%s\n' "$BADGING" | grep -F "package: name='com.nexauren.pdfmax' versionCode='10' versionName='1.2.5'"
+          printf '%s\n' "$BADGING" | grep -F "sdkVersion:'26'"
+          printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'36'"
+          jarsigner -verify -verbose -certs "$AAB_PATH" >/dev/null
+          echo "Verified APK identity/version and AAB signature: $APK_PATH / $AAB_PATH"
+          echo "Verified AAB: $AAB_PATH"
+          du -h "$APK_PATH" "$AAB_PATH"
+          cp "$APK_PATH" app-release-verified.apk
+          cp "$AAB_PATH" app-release-verified.aab
+          echo "Google Play will generate device-specific APK splits from the AAB."
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
           name: "PDF Max ${{ github.event.inputs.tag_name || github.ref_name }}"
           generate_release_notes: true
-          prerelease: true
+          prerelease: false
           files: |
-            PDF-Max-$RELEASE_TAG.apk
-            PDF-Max-$RELEASE_TAG.aab
+            app-release-verified.apk
+            app-release-verified.aab
           body: |
             PDF Max signed release APK and Android App Bundle. Google Play will generate device-specific APK splits from the AAB.
             The package is built with the private upload keystore, targets Android 16 (API 36), and uses R8/resource shrinking.
