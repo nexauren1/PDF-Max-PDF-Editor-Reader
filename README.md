@@ -71,6 +71,11 @@ Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) 
 - Release jobs validate the private upload keystore, password and alias before building. They fail instead of publishing a debug-signed production package.
 - The current candidate is `v1.2.6` (versionCode 11). The `v1.2.6-rc1` GitHub prerelease is published only by the one-time commit marker `[publish v1.2.6-rc1]`, after signed-package verification. It is intended for physical-device regression testing; it is not a device-certified stable release. Upload the AAB to Google Play, not the APK.
 
+## Privacy policy
+
+- Public bilingual policy page: https://nexauren1.github.io/PDF-Max-PDF-Editor-Reader/privacy-policy.html
+- Source policy: [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
+
 ## Google Play policy note
 
 PDF Max requests Android All files access because its core document library discovers and manages compatible documents across shared device storage. Google Play treats `MANAGE_EXTERNAL_STORAGE` as a restricted, high-risk permission: submit the Permissions Declaration Form, explain why a document library's full-device indexing cannot be replaced by a user-selected Storage Access Framework flow, and wait for approval. Approval is not guaranteed. See [Google Play's All files access policy](https://support.google.com/googleplay/android-developer/answer/10467955).
