@@ -98,6 +98,7 @@ private val tools = listOf(
 @Composable
 fun PDFMaxApp(initialPdf: Uri? = null) {
     var screen by remember { mutableStateOf(if (initialPdf == null) Page.HOME else Page.READER) }
+    var previousScreen by remember { mutableStateOf(Page.HOME) }
     var currentTool by remember { mutableStateOf(tools[0]) }
     var pdfUri by remember { mutableStateOf(initialPdf) }
     var selectedFile by remember { mutableStateOf<File?>(null) }
@@ -117,8 +118,22 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    fun go(target: Page) { screen = target; scope.launch { drawer.close() } }
-    fun openTool(tool: ToolSpec) { currentTool = tool; screen = tool.page }
+    fun go(target: Page) {
+        if (target != screen) previousScreen = screen
+        screen = target
+        scope.launch { drawer.close() }
+    }
+    fun openTool(tool: ToolSpec) {
+        previousScreen = screen
+        currentTool = tool
+        screen = tool.page
+    }
+    fun backFromWorkspace() {
+        val destination = previousScreen
+        screen = destination
+        previousScreen = Page.HOME
+        scope.launch { drawer.close() }
+    }
     fun openLocalFile(file: File) {
         val libraryPrefs = appContext.getSharedPreferences("pdfmax_library", android.content.Context.MODE_PRIVATE)
         val path = file.absolutePath
@@ -147,12 +162,14 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
         Scaffold(
             containerColor = MaxNavy,
             bottomBar = {
-                BottomBar(
-                    Modifier.fillMaxWidth(), screen, english,
-                    { go(Page.HOME) }, { go(Page.FILES) },
-                    { go(Page.CREATE_PDF) },
-                    { go(Page.FAVORITES) }, { scope.launch { drawer.open() } }
-                )
+                if (screen !in setOf(Page.READER, Page.OFFICE, Page.EDITOR, Page.CONVERTER, Page.SCANNER, Page.PROTECT, Page.TOOL)) {
+                    BottomBar(
+                        Modifier.fillMaxWidth(), screen, english,
+                        { go(Page.HOME) }, { go(Page.FILES) },
+                        { go(Page.CREATE_PDF) },
+                        { go(Page.FAVORITES) }, { scope.launch { drawer.open() } }
+                    )
+                }
             }
         ) { insets ->
             Column(
@@ -181,12 +198,12 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                         Page.TOOLS -> ToolsPage(english, { openTool(it) })
                         Page.READER -> ReaderPage(english, pdfName, pdfUri, selectedFile, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
                         Page.CREATE_PDF -> PdfCreatorScreen(english)
-                        Page.EDITOR -> ToolWorkspaceScreen(tools.first { it.title == "Editar PDF" }, english)
-                        Page.CONVERTER -> ToolWorkspaceScreen(tools.first { it.title == "Converter PDF" }, english)
-                        Page.SCANNER -> ToolWorkspaceScreen(tools.first { it.title == "Digitalizar e OCR" }, english)
-                        Page.PROTECT -> ToolWorkspaceScreen(tools.first { it.title == "Proteger PDF" }, english)
+                        Page.EDITOR -> ToolWorkspaceScreen(tools.first { it.title == "Editar PDF" }, english, ::backFromWorkspace)
+                        Page.CONVERTER -> ToolWorkspaceScreen(tools.first { it.title == "Converter PDF" }, english, ::backFromWorkspace)
+                        Page.SCANNER -> ToolWorkspaceScreen(tools.first { it.title == "Digitalizar e OCR" }, english, ::backFromWorkspace)
+                        Page.PROTECT -> ToolWorkspaceScreen(tools.first { it.title == "Proteger PDF" }, english, ::backFromWorkspace)
                         Page.SETTINGS -> SettingsPage(english, { toggleLanguage() })
-                        Page.TOOL -> ToolWorkspaceScreen(targetTool, english)
+                        Page.TOOL -> ToolWorkspaceScreen(targetTool, english, ::backFromWorkspace)
                     }
                 }
             }
