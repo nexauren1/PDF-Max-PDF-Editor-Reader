@@ -1295,7 +1295,7 @@ private fun DrawerItem(icon: ImageVector, label: String, selected: Boolean, clic
 }
 
 @Composable
-private fun BottomBar(modifier: Modifier, current: Page, en: Boolean, home: () -> Unit, files: () -> Unit, favoritesClick: () -> Unit, add: () -> Unit, menu: () -> Unit) {
+private fun BottomBar(modifier: Modifier, current: Page, en: Boolean, home: () -> Unit, files: () -> Unit, add: () -> Unit, favoritesClick: () -> Unit, menu: () -> Unit) {
     Row(modifier.background(Color(0xFF071329)).border(BorderStroke(1.dp, Color(0xFF1C3557))).navigationBarsPadding().height(66.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
         BottomItem(Modifier.weight(1f), Icons.Default.Home, if (en) "Home" else "Início", current == Page.HOME, home)
         BottomItem(Modifier.weight(1f), Icons.Default.FolderOpen, if (en) "Files" else "Arquivos", current == Page.FILES, files)
