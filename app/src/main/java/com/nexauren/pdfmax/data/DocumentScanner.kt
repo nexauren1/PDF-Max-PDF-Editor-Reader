@@ -62,12 +62,12 @@ data class IndexedDocument(
 object DocumentScanner {
     const val REFRESH_INTERVAL_MS = 20_000L
     private const val CACHE_TTL_MS = REFRESH_INTERVAL_MS
-    private const val QUERY_TIMEOUT_MS = 30_000L
+    private const val QUERY_TIMEOUT_MS = 10_000L
     private const val MAX_MEDIASTORE_RESULTS = 20_000
     private const val MAX_FALLBACK_RESULTS = 20_000
     private const val MAX_FALLBACK_DIRECTORIES = 20_000
     private const val MAX_FALLBACK_DEPTH = 12
-    private const val MAX_FALLBACK_SCAN_MS = 35_000L
+    private const val MAX_FALLBACK_SCAN_MS = 12_000L
     private const val PREFS = "pdfmax_document_index_v2"
     private const val PREF_DOCUMENTS = "documents_json"
     private const val PREF_LAST_SCAN = "last_scan_epoch"
@@ -218,7 +218,9 @@ object DocumentScanner {
             val lastFullScanAt = prefs.getLong(PREF_LAST_FULL_SCAN, 0L)
             // A full reconciliation is only needed on first run, manual refresh,
             // or every five minutes. Normal 20-second checks fetch only changed rows.
-            val fullScan = forceRefresh || cachedFiles.isEmpty() || lastFullScanAt == 0L ||
+            // An empty library is still a valid completed scan. Do not force a deep
+            // filesystem walk every 20 seconds just because the device has no matches.
+            val fullScan = forceRefresh || lastFullScanAt == 0L ||
                 now - lastFullScanAt >= FALLBACK_INTERVAL_MS
             val modifiedAfter = if (fullScan) null else (lastScanAt - 90_000L).coerceAtLeast(0L)
 
@@ -249,7 +251,9 @@ object DocumentScanner {
             val rowsRead = if (mediaStoreWorked) mediaStoreRows else -1
 
             val lastFallback = prefs.getLong(PREF_LAST_FALLBACK, 0L)
-            val shouldFallback = found.isEmpty() ||
+            // Deep folder traversal runs on the initial/deep reconciliation cadence,
+            // not on every incremental 20-second MediaStore refresh.
+            val shouldFallback = fullScan ||
                 lastFallback == 0L || now - lastFallback >= FALLBACK_INTERVAL_MS
 
             val folderStats = if (shouldFallback) {
@@ -284,6 +288,11 @@ object DocumentScanner {
             val result = found.values.sortedByDescending { it.modified }
             if (mediaStoreWorked && result.isEmpty() && cachedFiles.isNotEmpty() && (!fullScan || folderStats.rootsFound == 0 || folderStats.inaccessibleDirectories > 0 || folderStats.timedOut)) {
                 cachedAt = now
+                prefs.edit()
+                    .putLong(PREF_LAST_SCAN, now)
+                    .putLong(PREF_LAST_FULL_SCAN, if (fullScan) now else lastFullScanAt)
+                    .putString(PREF_LAST_DIAGNOSTIC, lastDiagnostic)
+                    .apply()
                 return cachedFiles
             }
             if (mediaStoreWorked) {
@@ -305,13 +314,18 @@ object DocumentScanner {
                 cachedFiles = result
                 cacheReady = true
                 cachedAt = now
-                persistIndex(appContext, result, lastScanAt, lastFullScanAt)
+                persistIndex(appContext, result, now, if (fullScan) now else lastFullScanAt)
                 return result
             }
 
-            cachedAt = 0L
-            appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().putString(PREF_LAST_DIAGNOSTIC, lastDiagnostic).apply()
+            // Record an empty-but-completed pass too. The next 20-second refresh
+            // can then look for new/changed rows instead of repeating the deep walk.
+            cachedAt = now
+            prefs.edit()
+                .putLong(PREF_LAST_SCAN, now)
+                .putLong(PREF_LAST_FULL_SCAN, if (fullScan) now else lastFullScanAt)
+                .putString(PREF_LAST_DIAGNOSTIC, lastDiagnostic)
+                .apply()
             return cachedFiles
         } catch (failure: Exception) {
             lastDiagnostic = "Scan failed: " + (failure.message ?: failure.javaClass.simpleName)
@@ -376,12 +390,21 @@ object DocumentScanner {
                 MediaStore.MediaColumns.DATE_MODIFIED
             )
         }
-        val selection = modifiedAfterMillis?.let {
-            "${MediaStore.MediaColumns.DATE_MODIFIED} >= ?"
+        // Filter at the MediaStore provider instead of iterating every image,
+        // audio and video row on the device and rejecting it in Kotlin.
+        val extensionSelection = supportedExtensions.joinToString(" OR ") {
+            "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?"
         }
-        val selectionArgs = modifiedAfterMillis?.let {
-            arrayOf((it / 1000L).toString())
+        val selection = buildString {
+            append("(").append(extensionSelection).append(")")
+            if (modifiedAfterMillis != null) {
+                append(" AND ").append(MediaStore.MediaColumns.DATE_MODIFIED).append(" >= ?")
+            }
         }
+        val selectionArgs = buildList {
+            supportedExtensions.forEach { add("%." + it) }
+            modifiedAfterMillis?.let { add((it / 1000L).toString()) }
+        }.toTypedArray()
         val cancellation = CancellationSignal()
         val handler = Handler(Looper.getMainLooper())
         val timeout = Runnable { cancellation.cancel() }
@@ -408,7 +431,7 @@ object DocumentScanner {
                 val volumeRoot = resolveVolumeRoot(context, volumeName)
                 var count = 0
                 var visited = 0
-                while (cursor.moveToNext() && count < MAX_MEDIASTORE_RESULTS && visited < 300_000) {
+                while (cursor.moveToNext() && count < MAX_MEDIASTORE_RESULTS && visited < 100_000) {
                     visited++
                     val name = cursor.getString(nameColumn)?.takeIf { it.isNotBlank() } ?: continue
                     val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
