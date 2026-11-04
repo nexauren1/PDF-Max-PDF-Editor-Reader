@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="index,follow">
+  <meta name="theme-color" content="#071329">
+  <meta name="description" content="Política de Privacidade do PDF Max – PDF Editor & Reader. Saiba como os documentos, permissões e dados técnicos são tratados.">
+  <link rel="canonical" href="https://nexauren1.github.io/PDF-Max-PDF-Editor-Reader/privacy-policy.html">
+  <title>Política de Privacidade | PDF Max</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050d1c;
+      --panel: #0b1830;
+      --panel2: #101f3b;
+      --line: #203b65;
+      --text: #edf4ff;
+      --muted: #a9bbd6;
+      --cyan: #42d7ff;
+      --blue: #3d83ff;
+      --violet: #a56bff;
+      --yellow: #ffd66b;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse at 12% 0%, rgba(23, 93, 214, .22), transparent 36rem),
+        radial-gradient(ellipse at 92% 8%, rgba(126, 39, 232, .18), transparent 32rem),
+        var(--bg);
+      color: var(--text);
+      font: 16px/1.72 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--cyan); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { color: #a6efff; }
+    .wrap { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 64px; }
+    .hero {
+      padding: 28px;
+      border: 1px solid rgba(75, 148, 255, .55);
+      border-radius: 26px;
+      background: linear-gradient(125deg, rgba(33, 67, 151, .75), rgba(53, 24, 111, .68) 58%, rgba(4, 74, 111, .62));
+      box-shadow: 0 20px 70px rgba(0, 0, 0, .28), 0 0 35px rgba(40, 125, 255, .12);
+    }
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .appicon {
+      display: grid; place-items: center; width: 54px; height: 54px; flex: 0 0 54px;
+      border-radius: 15px; border: 1px solid rgba(255,255,255,.35);
+      background: linear-gradient(145deg, #f72b63, #a20bda 58%, #087cff);
+      font-size: 19px; font-weight: 900; letter-spacing: -1px; color: white;
+      box-shadow: 0 0 22px rgba(60, 139, 255, .55);
+    }
+    .brandname { margin: 0; font-size: 20px; font-weight: 850; letter-spacing: -.5px; }
+    .tagline { margin: 1px 0 0; font-size: 12px; color: #d7e5ff; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 25px 0 7px; font-size: clamp(29px, 5vw, 42px); line-height: 1.12; letter-spacing: -1.2px; }
+    .sub { margin: 0; color: #d6e4ff; max-width: 690px; }
+    .meta { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 20px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px; border-radius: 999px;
+      padding: 6px 11px; border: 1px solid rgba(255,255,255,.2);
+      background: rgba(3, 12, 35, .32); color: #e9f4ff; font-size: 12px;
+    }
+    nav {
+      position: sticky; top: 10px; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px;
+      margin: 18px 0; padding: 10px; border: 1px solid var(--line); border-radius: 17px;
+      background: rgba(7, 19, 41, .9); backdrop-filter: blur(16px);
+    }
+    nav a {
+      padding: 6px 10px; border-radius: 10px; background: rgba(29, 65, 116, .38);
+      color: #dbeaff; font-size: 12px; text-decoration: none;
+    }
+    .notice {
+      margin: 18px 0; padding: 15px 17px; border-radius: 15px;
+      border: 1px solid rgba(66, 215, 255, .35); background: rgba(13, 55, 84, .42);
+      color: #dcefff;
+    }
+    .section {
+      margin-top: 16px; padding: 23px 24px; border-radius: 20px;
+      border: 1px solid var(--line); background: linear-gradient(145deg, rgba(13, 29, 55, .96), rgba(8, 19, 39, .96));
+    }
+    h2 { margin: 0 0 11px; font-size: 20px; line-height: 1.3; letter-spacing: -.3px; }
+    h3 { margin: 19px 0 7px; font-size: 15px; color: #d7eaff; }
+    p { margin: 9px 0; color: var(--muted); }
+    ul { margin: 8px 0 8px 20px; padding: 0; color: var(--muted); }
+    li { padding: 3px 0; }
+    strong { color: #f3f7ff; }
+    .pt, .en { scroll-margin-top: 95px; }
+    .en { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 17px; }
+    .language { display: inline-block; margin-bottom: 8px; color: var(--cyan); font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    .footer { padding: 24px 8px 0; text-align: center; color: #8297b7; font-size: 12px; }
+    .footer a { color: #a7caff; }
+    @media (max-width: 560px) {
+      .wrap { width: min(100% - 20px, 920px); padding-top: 12px; }
+      .hero { padding: 21px 18px; border-radius: 21px; }
+      .section { padding: 18px 16px; border-radius: 17px; }
+      nav { top: 5px; }
+      nav a { font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <div class="brand">
+        <div class="appicon" aria-hidden="true">PDF</div>
+        <div>
+          <p class="brandname">PDF Max</p>
+          <p class="tagline">PDF Editor &amp; Reader</p>
+        </div>
+      </div>
+      <h1>Política de Privacidade</h1>
+      <p class="sub">Como o PDF Max acede aos documentos, processa ficheiros e trata informações técnicas. Esta política está disponível em português e inglês.</p>
+      <div class="meta">
+        <span class="pill">Versão da aplicação: 1.2.6</span>
+        <span class="pill">Actualizada: 4 de Novembro de 2026</span>
+        <span class="pill">Android · Processamento local</span>
+      </div>
+    </header>
+
+    <nav aria-label="Navegação da política">
+      <a href="#pt-intro">Português</a>
+      <a href="#en-intro">English</a>
+      <a href="#pt-google">Dados Google / ML Kit</a>
+      <a href="#pt-contact">Contacto</a>
+    </nav>
+
+    <section class="section pt" id="pt-intro">
+      <span class="language">Português</span>
+      <h2>1. Introdução</h2>
+      <p>O <strong>PDF Max – PDF Editor &amp; Reader</strong> é uma aplicação Android para leitura, organização, digitalização e edição de documentos. Esta política explica que informações a aplicação utiliza, onde são guardadas e quando um serviço de terceiros pode receber dados técnicos.</p>
+      <p>O PDF Max não exige a criação de uma conta e não possui um serviço próprio de armazenamento na nuvem. As operações normais sobre documentos são realizadas no dispositivo.</p>
+    </section>
+
+    <section class="section pt">
+      <h2>2. Permissões e acesso aos ficheiros</h2>
+      <p>Para construir a biblioteca interna e localizar documentos nas pastas partilhadas do dispositivo, o PDF Max solicita a permissão especial <strong>“Acesso a todos os ficheiros”</strong> do Android (<code>MANAGE_EXTERNAL_STORAGE</code>). Nas versões mais antigas do Android pode ser utilizada a permissão de leitura do armazenamento.</p>
+      <p>Esta autorização permite pesquisar ficheiros compatíveis no armazenamento partilhado, apresentar os resultados na biblioteca e ler ou criar ficheiros quando o utilizador inicia uma ferramenta. Não é uma autorização limitada apenas a um documento escolhido individualmente. O utilizador pode retirar a permissão nas definições do Android; nesse caso, a pesquisa da biblioteca pode deixar de funcionar.</p>
+      <p>As extensões indexadas incluem PDF, formatos Word, Excel e PowerPoint, imagens, texto e arquivos compactados. A aplicação não elimina automaticamente os documentos originais.</p>
+    </section>
+
+    <section class="section pt">
+      <h2>3. Informações guardadas no dispositivo</h2>
+      <p>Para manter a biblioteca e as preferências entre sessões, o PDF Max guarda localmente, na área privada da aplicação:</p>
+      <ul>
+        <li>Índice de documentos: nome, caminho, extensão, tamanho e data de modificação dos ficheiros encontrados.</li>
+        <li>Lista de ficheiros recentes, favoritos e entradas ocultadas na Lixeira interna.</li>
+        <li>Marcadores de páginas do leitor e preferência de idioma.</li>
+        <li>Ficheiros temporários necessários para preparar um resultado ou uma cópia para partilha.</li>
+      </ul>
+      <p>A Lixeira interna apenas oculta uma entrada da biblioteca; não elimina nem move o ficheiro original. O índice e as preferências não são enviados para uma conta ou cópia de segurança do PDF Max.</p>
+    </section>
+
+    <section class="section pt">
+      <h2>4. Processamento e armazenamento dos documentos</h2>
+      <p>As operações de leitura, edição, junção, divisão, compressão, protecção, conversão, extracção e criação de PDFs são realizadas localmente no dispositivo. O PDF Max não envia o conteúdo dos documentos para servidores operados pelo programador.</p>
+      <p>Os resultados são guardados em <strong>Documentos/PDF Max</strong>. As imagens capturadas pela câmara são guardadas em <strong>Documentos/PDF Max/Scans</strong>. Durante uma operação, podem existir cópias temporárias na área privada/cache da aplicação para permitir rever o resultado antes de o guardar definitivamente.</p>
+      <p>Depois de guardar ou descartar um resultado, a aplicação elimina as cópias temporárias de revisão quando possível. O Android também pode limpar a cache. Os documentos já exportados para a pasta partilhada permanecem no dispositivo mesmo depois de limpar os dados ou desinstalar a aplicação; o utilizador deve eliminá-los manualmente.</p>
+    </section>
+
+    <section class="section pt">
+      <h2>5. Câmara e reconhecimento de texto (OCR)</h2>
+      <p>A permissão da câmara é solicitada apenas quando o utilizador escolhe a função de digitalização com a câmara integrada. A captura é iniciada pelo utilizador. As imagens capturadas são guardadas localmente e o reconhecimento de texto (OCR) é executado no dispositivo através do ML Kit.</p>
+      <p>O PDF Max não utiliza a câmara em segundo plano para recolher imagens.</p>
+    </section>
+
+    <section class="section pt" id="pt-google">
+      <h2>6. Google ML Kit, tradução e dados técnicos</h2>
+      <p>O OCR e a tradução utilizam componentes Google ML Kit. O reconhecimento e a tradução do conteúdo do documento são processados no dispositivo. Para traduzir, a aplicação pode descarregar modelos de idioma através do Google Play services; o código actual solicita que esse descarregamento seja feito por Wi-Fi.</p>
+      <p><strong>Importante:</strong> os SDKs ML Kit para Android recolhem determinados dados técnicos para diagnóstico e análise de utilização. De acordo com a documentação da Google, esses dados podem incluir fabricante e modelo do dispositivo, versão/build do Android, nome do pacote e versão da aplicação, identificadores de dispositivo ou de instalação, métricas de desempenho/latência, configuração da API, tamanho dos dados de entrada e saída, versão da funcionalidade, tipos de eventos e códigos de erro. Na função de tradução também podem ser recolhidos os idiomas de origem e destino configurados e informações técnicas associadas à configuração remota/instalações Firebase.</p>
+      <p>A Google declara que os dados técnicos listados são encriptados durante a transmissão por HTTPS e que não são transferidos pela Google para terceiros. Esta recolha técnica é distinta do conteúdo do PDF: a aplicação utiliza os modelos no dispositivo para processar o texto e não envia o documento completo ao programador. Consulta a <a href="https://developers.google.com/ml-kit/android-data-disclosure" target="_blank" rel="noopener noreferrer">divulgação de dados do ML Kit</a>, os <a href="https://developers.google.com/ml-kit/terms" target="_blank" rel="noopener noreferrer">termos do ML Kit</a> e a <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Política de Privacidade da Google</a>.</p>
+      <p>A tradução é automática e pode conter erros. Revê nomes, números e informação importante antes de utilizares o resultado.</p>
+    </section>
+
+    <section class="section pt">
+      <h2>7. Partilha e impressão</h2>
+      <p>A partilha ou impressão só é iniciada quando o utilizador escolhe essa acção. O Android abre a folha de partilha ou o serviço de impressão, e o utilizador escolhe a aplicação, destinatário ou impressora. A partir desse momento, o tratamento do ficheiro também está sujeito às políticas do serviço seleccionado.</p>
+    </section>
+
+    <section class="section pt">
+      <h2>8. Dados que o programador não recolhe directamente</h2>
+      <p>A versão actual não inclui sistema próprio de contas, publicidade, SDK de analytics do programador nem serviço de envio de documentos. O programador não recebe através da aplicação o índice de ficheiros, os documentos, favoritos, histórico, marcadores ou preferências guardadas localmente.</p>
+      <p>A aplicação não solicita permissões de localização, contactos, microfone ou SMS. Esta declaração não elimina a recolha de dados técnicos efectuada pelos SDKs Google descrita na secção anterior.</p>
+    </section>
+
+    <section class="section pt">
+      <h2>9. Conservação e eliminação dos dados</h2>
+      <p>O índice, as preferências e os ficheiros temporários permanecem na área privada da aplicação enquanto forem necessários. O utilizador pode limpar os dados do PDF Max ou desinstalá-lo para remover essas informações locais. Os documentos exportados para <strong>Documentos/PDF Max</strong> e as digitalizações nessa pasta não são apagados automaticamente quando a aplicação é desinstalada.</p>
+    </section>
+
+    <section class="section pt">
+      <h2>10. Segurança</h2>
+      <p>O PDF Max procura manter o processamento normal no dispositivo e utiliza o mecanismo Android FileProvider para conceder acesso temporário a ficheiros quando o utilizador partilha um documento. Protege o dispositivo com bloqueio de ecrã, mantém o Android actualizado e partilha documentos apenas com destinatários de confiança.</p>
+    </section>
+
+    <section class="section pt">
+      <h2>11. Crianças</h2>
+      <p>O PDF Max é uma ferramenta geral de produtividade documental e não foi concebido especificamente para crianças. O programador não recolhe conscientemente dados pessoais de crianças através de um sistema próprio da aplicação.</p>
+    </section>
+
+    <section class="section pt" id="pt-contact">
+      <h2>12. Alterações e contacto</h2>
+      <p>Esta política pode ser actualizada quando as funcionalidades da aplicação ou os requisitos legais mudarem. A data de actualização será alterada na página.</p>
+      <p>Para dúvidas ou pedidos relacionados com privacidade, utiliza a <a href="https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/issues" target="_blank" rel="noopener noreferrer">página de suporte do PDF Max no GitHub</a>. Os problemas do GitHub podem ser públicos: não publiques documentos, palavras-passe, dados bancários ou outras informações sensíveis num issue público.</p>
+      <p><strong>Programador:</strong> Nexauren · PDF Max</p>
+    </section>
+
+    <section class="section en" id="en-intro" lang="en">
+      <span class="language">English</span>
+      <h2>Privacy Policy</h2>
+      <p><strong>PDF Max – PDF Editor &amp; Reader</strong> is an Android application for reading, organising, scanning and editing documents. This policy explains what information the app uses, where it is stored, and when a third-party service may receive technical data.</p>
+      <p>PDF Max does not require an account and does not operate its own cloud storage service. Normal document operations are performed on the device.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>1. Permissions and file access</h2>
+      <p>To build its internal library and find documents in shared device storage, PDF Max requests Android's special <strong>All files access</strong> permission (<code>MANAGE_EXTERNAL_STORAGE</code>). Older Android versions may use the storage read permission.</p>
+      <p>This permission allows the app to search for supported files in shared storage, display them in its library, and read or create files when the user starts a tool. It is not limited to a single file selected through a document picker. The user can revoke this permission in Android settings; library scanning may then stop working.</p>
+      <p>Indexed file types include PDF, Word, Excel and PowerPoint formats, images, text files and archives. Original documents are not automatically deleted.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>2. Information stored on your device</h2>
+      <p>To maintain the library and preferences between sessions, PDF Max stores the following in the app's private storage:</p>
+      <ul>
+        <li>Document index: file name, path, extension, size and modification date for discovered files.</li>
+        <li>Recent files, favourites and entries hidden in the in-app Trash.</li>
+        <li>Reader page bookmarks and language preference.</li>
+        <li>Temporary files needed to prepare a result or a share copy.</li>
+      </ul>
+      <p>The in-app Trash only hides a library entry; it does not delete or move the original file. The index and preferences are not uploaded to a PDF Max account or cloud backup.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>3. Document processing and storage</h2>
+      <p>Reading, editing, merging, splitting, compressing, protecting, converting, extracting and creating PDFs are performed locally on the device. PDF Max does not send document contents to servers operated by the developer.</p>
+      <p>Output files are saved in <strong>Documents/PDF Max</strong>. Camera captures are saved in <strong>Documents/PDF Max/Scans</strong>. During an operation, temporary copies may be created in the app's private cache so you can review a result before saving it permanently.</p>
+      <p>After a result is saved or discarded, the app removes review copies when possible. Android may also clear the cache. Files already exported to the shared folder remain on the device after app data is cleared or the app is uninstalled; you must delete those files yourself.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>4. Camera and optical character recognition (OCR)</h2>
+      <p>Camera permission is requested only when you choose the built-in document capture feature. Capture is started by the user. Captured images are stored locally and OCR is performed on the device using ML Kit.</p>
+      <p>PDF Max does not use the camera in the background to collect images.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>5. Google ML Kit, translation and technical data</h2>
+      <p>OCR and translation use Google ML Kit components. Recognition and translation of document content are processed on the device. To translate a document, the app may download language models through Google Play services; the current code requests these downloads over Wi-Fi.</p>
+      <p><strong>Important:</strong> Google ML Kit Android SDKs collect certain technical data for diagnostics and usage analytics. According to Google's documentation, this may include device manufacturer and model, Android version/build, app package name and version, device or per-installation identifiers, performance/latency metrics, API configuration, feature input/output size, feature version, event types and error codes. The translation feature may also collect configured source and target languages and technical information associated with Firebase remote configuration/installation diagnostics.</p>
+      <p>Google states that the listed technical data is encrypted in transit using HTTPS and is not transferred by Google to third parties. This technical collection is separate from the PDF content: the app uses on-device models to process text and does not send the complete document to the developer. See Google's <a href="https://developers.google.com/ml-kit/android-data-disclosure" target="_blank" rel="noopener noreferrer">ML Kit Android data disclosure</a>, <a href="https://developers.google.com/ml-kit/terms" target="_blank" rel="noopener noreferrer">ML Kit terms</a> and <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.</p>
+      <p>Translations are automatic and may contain errors. Review names, numbers and important information before relying on the output.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>6. Sharing and printing</h2>
+      <p>Sharing or printing starts only when you choose that action. Android opens the system share sheet or print service, and you choose the app, recipient or printer. From that point, the selected service's own privacy policy also applies to the file.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>7. Information not directly collected by the developer</h2>
+      <p>The current app build does not include a developer-operated account system, advertising, a developer analytics SDK or a document upload service. The developer does not receive the file index, documents, favourites, history, bookmarks or preferences stored locally through the app.</p>
+      <p>The app does not request location, contacts, microphone or SMS permissions. This statement does not exclude technical data collection by Google SDKs described above.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>8. Retention and deletion</h2>
+      <p>The index, preferences and temporary files remain in the app's private storage while needed. You can clear PDF Max app data or uninstall it to remove this local information. Exported documents in <strong>Documents/PDF Max</strong> and scans in that folder are not automatically deleted when the app is uninstalled.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>9. Security</h2>
+      <p>PDF Max is designed to keep normal processing on the device and uses Android FileProvider to grant temporary file access when you choose to share a document. Protect your device with a screen lock, keep Android up to date and share documents only with trusted recipients.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>10. Children</h2>
+      <p>PDF Max is a general-purpose document productivity tool and is not specifically designed for children. The developer does not knowingly collect children's personal information through an app-operated system.</p>
+    </section>
+
+    <section class="section en" lang="en">
+      <h2>11. Changes and contact</h2>
+      <p>This policy may be updated when app features or legal requirements change. The revision date will be updated on this page.</p>
+      <p>For privacy questions or requests, use the <a href="https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/issues" target="_blank" rel="noopener noreferrer">PDF Max GitHub support page</a>. GitHub issues may be public: do not post documents, passwords, payment details or other sensitive information in a public issue.</p>
+      <p><strong>Developer:</strong> Nexauren · PDF Max</p>
+    </section>
+
+    <footer class="footer">
+      <p>PDF Max · Privacy Policy · Version 1.2.6 · 4 November 2026</p>
+      <p><a href="https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader">Source repository</a> · <a href="https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/issues">Support</a></p>
+    </footer>
+  </main>
+</body>
+</html>
