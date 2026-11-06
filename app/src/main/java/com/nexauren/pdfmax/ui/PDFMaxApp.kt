@@ -66,7 +66,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 private enum class Screen {
-    HOME, FILES, TOOLS, FAVORITES, RECENT, TRASH, CREATE, COMPRESS,
+    ONBOARDING, HOME, FILES, TOOLS, FAVORITES, RECENT, TRASH, CREATE, COMPRESS,
     MERGE, READER, WORKSPACE, SETTINGS, PROCESSING, RESULT
 }
 
@@ -87,7 +87,10 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
 
     var dark by rememberSaveable { mutableStateOf(prefs.getBoolean("dark_theme", true)) }
     var english by rememberSaveable { mutableStateOf(prefs.getBoolean("english", false)) }
-    var screen by rememberSaveable { mutableStateOf(Screen.HOME) }
+    var screen by rememberSaveable {
+        mutableStateOf(if (prefs.getBoolean("onboarding_done", false)) Screen.HOME else Screen.ONBOARDING)
+    }
+    var welcomePage by rememberSaveable { mutableIntStateOf(0) }
     var files by remember { mutableStateOf(store.listDocuments()) }
     var trash by remember { mutableStateOf(store.listTrash()) }
     var favorites by remember { mutableStateOf(store.favoritePaths()) }
@@ -354,12 +357,13 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                 refresh()
                 selectedFile = imported
                 store.recordOpened(imported)
+                prefs.edit().putBoolean("onboarding_done", true).apply()
                 go(Screen.READER)
             }
         }
     }
 
-    BackHandler(enabled = screen != Screen.HOME || drawer.isOpen || showQuick) {
+    BackHandler(enabled = (screen != Screen.HOME && screen != Screen.ONBOARDING) || drawer.isOpen || showQuick) {
         when {
             showQuick -> showQuick = false
             drawer.isOpen -> scope.launch { drawer.close() }
@@ -414,7 +418,7 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                 containerColor = MaterialTheme.colorScheme.background,
                 snackbarHost = { SnackbarHost(snackbar) },
                 bottomBar = {
-                    if (screen !in setOf(Screen.READER, Screen.PROCESSING, Screen.RESULT, Screen.WORKSPACE, Screen.MERGE, Screen.CREATE, Screen.COMPRESS, Screen.TRASH)) {
+                    if (screen !in setOf(Screen.ONBOARDING, Screen.READER, Screen.PROCESSING, Screen.RESULT, Screen.WORKSPACE, Screen.MERGE, Screen.CREATE, Screen.COMPRESS, Screen.TRASH)) {
                         NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                             NavigationBarItem(screen == Screen.HOME, { go(Screen.HOME) }, icon = { Icon(Icons.Default.Home, null) }, label = { Text(if (english) "Home" else "Início") })
                             NavigationBarItem(screen == Screen.FILES, { go(Screen.FILES) }, icon = { Icon(Icons.Default.FolderOpen, null) }, label = { Text(if (english) "Files" else "Ficheiros") })
@@ -437,6 +441,19 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                     label = "PDF Max screen transition"
                 ) { current ->
                     when (current) {
+                        Screen.ONBOARDING -> WelcomeScreen(
+                            english = english,
+                            page = welcomePage,
+                            onPage = { welcomePage = it },
+                            onSkip = {
+                                prefs.edit().putBoolean("onboarding_done", true).apply()
+                                go(Screen.HOME)
+                            },
+                            onStart = {
+                                prefs.edit().putBoolean("onboarding_done", true).apply()
+                                go(Screen.HOME)
+                            }
+                        )
                         Screen.HOME -> HomeScreen(
                             english = english,
                             files = files,
@@ -598,6 +615,130 @@ fun PDFMaxApp(initialPdf: Uri? = null) {
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun WelcomeScreen(
+    english: Boolean,
+    page: Int,
+    onPage: (Int) -> Unit,
+    onSkip: () -> Unit,
+    onStart: () -> Unit
+) {
+    val headings = if (english) listOf(
+        "Your PDFs, all in one place",
+        "Create, compress and combine",
+        "Read, organise and protect"
+    ) else listOf(
+        "Os teus PDFs, num só lugar",
+        "Cria, comprime e junta",
+        "Lê, organiza e protege"
+    )
+    val descriptions = if (english) listOf(
+        "A focused document workspace designed to make everyday PDF tasks feel simple.",
+        "Turn photos into PDFs, reduce file size and bring documents together in the order you choose.",
+        "Preview every page, keep favourite files close and use dedicated tools when you need them."
+    ) else listOf(
+        "Um espaço de documentos pensado para tornar as tarefas PDF do dia a dia mais simples.",
+        "Transforma fotografias em PDF, reduz o tamanho e junta documentos pela ordem que escolheres.",
+        "Pré-visualiza páginas, guarda favoritos e utiliza ferramentas próprias para cada tarefa."
+    )
+    val icons = listOf(Icons.Default.PictureAsPdf, Icons.Default.AutoAwesome, Icons.Default.FolderOpen)
+
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            PdfMaxLogo(43)
+            Spacer(Modifier.width(10.dp))
+            Text("PDF Max", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onSkip) { Text(if (english) "Skip" else "Saltar") }
+        }
+
+        Spacer(Modifier.weight(1f))
+        androidx.compose.animation.AnimatedContent(
+            targetState = page.coerceIn(0, 2),
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInHorizontally { it / 5 }) togetherWith
+                    (androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutHorizontally { -it / 5 })
+            },
+            label = "Welcome slides"
+        ) { current ->
+            Column(
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().height(300.dp)
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF142E62), Color(0xFF101C3E), Color(0xFF064D68))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        Modifier.size(188.dp)
+                            .background(
+                                Brush.linearGradient(listOf(Color(0xFF0ECDE5), Color(0xFF2877EA))),
+                                RoundedCornerShape(42.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(icons[current], null, tint = Color.White, modifier = Modifier.size(104.dp))
+                    }
+                    Text(
+                        "PDF",
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(22.dp),
+                        color = Color(0xFF8AEFFF),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 20.sp,
+                        letterSpacing = 2.sp
+                    )
+                }
+                Spacer(Modifier.height(35.dp))
+                Text(headings[current], style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(10.dp))
+                Text(descriptions[current], color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, lineHeight = 22.sp, fontSize = 14.sp)
+            }
+        }
+        Spacer(Modifier.height(28.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            repeat(3) { index ->
+                Box(
+                    Modifier.size(if (index == page) 11.dp else 9.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (index == page) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
+                        .clickable { onPage(index) }
+                )
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Button(
+            onClick = {
+                if (page < 2) onPage(page + 1) else onStart()
+            },
+            modifier = Modifier.fillMaxWidth().height(62.dp),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Text(
+                if (page < 2) (if (english) "Continue" else "Continuar")
+                else (if (english) "Start Now" else "Começar agora"),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Text(
+            if (english) "Free · no account required" else "Gratuito · sem necessidade de conta",
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp
+        )
     }
 }
 
