@@ -1,85 +1,65 @@
 # PDF Max – PDF Editor & Reader
 
-PDF Max is an Android document workspace built with Kotlin, Jetpack Compose, Android PdfRenderer, PDFBox-Android, CameraX and ML Kit.
+PDF Max 2.0 is a fresh Android PDF workspace. The previous interface and its broad-storage scanning model have been removed. The Android application ID remains `com.nexauren.pdfmax`.
 
-## Product direction
+## Product experience
 
-The UI follows the supplied PDF Max reference:
-- Deep navy interface, electric-blue borders and violet accents.
-- Color-coded tool cards with category filters and a separate tool workspace with matching accent color.\n- Every operation follows three screens: file selection and options, visible processing with elapsed time, then result review and explicit save.
-- Dashboard with recent documents, quick actions and an internal document library.
-- Reader with page navigation, previews, zoom, text search, persistent bookmarks, night display, sharing, printing and PDF properties. Navigation between different tool workspaces is animated too.
-- In-app bottom navigation and a full side drawer.
+The interface follows the supplied ten-screen direction:
+- Deep navy surfaces, one bright cyan/blue accent family, and a matching light theme.
+- Home with three primary actions: Compress, Merge and Create PDF.
+- A separate Tools catalogue with individual workspaces for each operation.
+- My Files with search, page thumbnails, favourites, recently opened files and an in-app Trash.
+- Reader with page-by-page rendering, sharing and quick access to editing tools.
+- Settings for Portuguese/English and dark/light appearance.
+- Animated screen transitions. Navigation and back navigation display a rotating gear transition; PDF operations show a separate processing screen while work runs.
 
-## Internal document library
+## Current local PDF operations
 
-PDF Max scans supported files on the device and displays them inside its own library. Users search and select documents in PDF Max; normal tool flows do not open a third-party file picker.
+- Create a multi-page PDF from selected photos or a camera capture.
+- Merge selected PDFs in the order chosen by the user.
+- Rewrite/re-save a PDF and report the actual before/after size. This is a best-effort optimization; the result can be larger than the source.
+- Extract selected page ranges into a new PDF.
+- Remove selected page ranges into a new PDF.
+- Rotate every page by 90°, 180° or 270°.
+- Add a text watermark or text overlay.
+- Add page numbers.
+- Protect a PDF with an opening password.
+- Remove PDF protection when the current password is provided.
+- Extract selectable text to UTF-8 TXT.
+- Render pages to PNG images inside a ZIP file.
+- Update PDF title and author metadata.
 
-Indexed extensions include:
-- PDF.
-- Word: DOC, DOCX, ODT and RTF.
-- Spreadsheets: XLS, XLSX, CSV and ODS.
-- Presentations: PPT, PPTX and ODP.
-- Images: JPG, JPEG, PNG, WEBP, GIF, BMP, TIF, TIFF and HEIC.
-- Text and archives: TXT, MD, LOG, ZIP, RAR, 7Z, TAR and GZ.
+Each tool has a dedicated options screen. Operations run locally, create a separate output, and do not overwrite the source document. The processing indicator is indeterminate because PDFBox does not expose trustworthy page-by-page progress for every operation; the app does not fabricate a percentage.
 
-On Android 11 and later, full device scanning requires the Android “All files access” special permission. PDF Max explains this in the app and opens the relevant system permission screen. Google Play distribution may require an All files access declaration and policy review. The app does not use this permission to upload documents.
+## Files and privacy model
 
-## Implemented local operations
+PDF Max no longer requests `MANAGE_EXTERNAL_STORAGE`, broad shared-storage access, or network access. Users explicitly choose PDFs through Android's document picker and choose photos through the system photo picker. The app copies imported PDFs into its private document workspace.
 
-- Import and preview PDF pages with Android PdfRenderer.
-- Search/index supported files in the internal library; save favourites, review recently opened files and move entries to a reversible in-app trash (source files are not deleted).
-- Merge and split PDFs.
-- Reorder, extract, remove selected pages and insert blank pages.
-- Rotate pages, add text overlays, watermarks and page numbering.
-- Set PDF open passwords.
-- Fill existing AcroForm text fields by field name; flatten existing form fields into fixed page content.
-- Add a handwritten visual signature stamp to a PDF.
-- Extract text to UTF-8 TXT and images; convert PDF pages to images.
-- Batch-create a multi-page PDF from selected images and run batch OCR on several scans into one searchable PDF.
-- Create ZIP archives from selected documents and detect exact duplicate files with SHA-256 (no automatic deletion).
-- Edit PDF title, author, subject and keywords; remove standard document information and the catalog XMP metadata stream (embedded object metadata may remain).\n- Generate a PDF report with page count, file size, extractable word/line/character counts.
-- Create structured PDFs in the Writing Lab: title, subtitle, paragraphs, Sans/Serif/Mono fonts, Normal/Bold/Italic styles, adjustable body size, live preview and editable three-column tables.
-- OCR from an image using on-device ML Kit.
-- Capture a document photo inside the app using CameraX, then run OCR.
-- Convert modern DOCX/XLSX/PPTX and text documents to text-based PDF.
-- Export selectable PDF text to DOCX, XLSX and PPTX.
-- Compare extracted text and inspect PDF metadata.
-- Share PDFs through Android's secure FileProvider and print through Android PrintManager.
+The in-app library currently indexes PDFs imported or created by PDF Max; it does not crawl the whole device. Favourites, recent paths and Trash state are stored locally. Trash moves an app-owned file to a private Trash folder; permanent deletion requires a separate user action.
 
-Outputs are saved under Documents/PDF Max (scans under Documents/PDF Max/Scans) and then appear in the internal library.
+The app does not include a developer-operated account, cloud sync, advertising SDK, analytics SDK or document-upload service. Sharing is started only by the user through Android's sharing mechanism.
 
-## Known limitations
+## Current limitations
 
-- Legacy binary DOC/XLS/PPT files can be indexed, but local preview/conversion is not implemented. Save them as DOCX/XLSX/PPTX first.
-- Embedded JPEG 2000 / JPX images are not guaranteed to render because the optional decoder is not bundled in this release.
-- PDF-to-Office exports preserve selectable text, not the original page layout, typography, complex tables or embedded images.
-- Adding text is an overlay; it does not rewrite existing PDF text objects.
-- The handwritten signature is a visible handwritten stamp, not a certificate-backed cryptographic digital signature.
-- Filling forms supports existing AcroForm text fields, not every XFA form.
-- PDF re-save, repair and compression depend on the source; a saved file is not guaranteed to be smaller. The compression result screen compares the original and output sizes and reports the actual change. A severely corrupted file may not be recoverable.
-- PDF translation is powered by Google Translate through on-device ML Kit language models. The first use downloads selected source/target models over Wi‑Fi; scanned PDFs need OCR before translation. Translation results are automatic and should be reviewed. The app labels the action and results with Google Translate attribution and links to https://translate.google.com.
+- Camera capture uses Android's system camera capture flow. Automatic edge detection, perspective correction, manual crop handles and scanner filters are not part of this build yet.
+- Compression is a best-effort PDF rewrite, not a guaranteed image recompression. The result screen reports the actual size change, including when the output is larger.
+- Text and watermark tools add overlays; they do not edit the original text objects already inside a PDF.
+- Text extraction exports selectable text. Scanned image-only pages require OCR, which is not included in this clean 2.0 foundation.
+- The reader renders pages and provides share/favourite/tool navigation. Highlight, freehand drawing and certificate-backed digital signatures are not yet implemented as editing actions.
 
-## Build and release
+## Build
 
-- Android Gradle Plugin 8.10.1, Gradle 8.11.1 and JDK 17.
-- Compile SDK 36 and target SDK 36 (Android 16); minimum Android 8.0 (API 26).
-- GitHub Actions runs unit tests, builds Debug APKs, a privately signed universal Release APK for direct device testing, and a signed Android App Bundle (AAB).
-- Release CI verifies the APK signature, package ID, version metadata and AAB signature before publishing artifacts.
-- PDF processing uses disk-backed PDFBox scratch storage for memory-intensive operations; image-to-PDF decodes images at a bounded resolution to reduce RAM spikes.
-- Release builds use R8 code shrinking and resource shrinking. CI prints APK/AAB sizes. Google Play should receive the AAB; Google Play generates device-specific APK splits automatically.
-- Release jobs validate the private upload keystore, password and alias before building. They fail instead of publishing a debug-signed production package.
-- The current candidate is `v1.2.6` (versionCode 11). The `v1.2.6-rc1` GitHub prerelease is published only by the one-time commit marker `[publish v1.2.6-rc1]`, after signed-package verification. It is intended for physical-device regression testing; it is not a device-certified stable release. Upload the AAB to Google Play, not the APK.
+- Kotlin, Jetpack Compose and Material 3.
+- Android Gradle Plugin 8.10.1, Kotlin 2.0.21 and JDK 17.
+- Compile/target SDK 36, minimum Android 8.0 (API 26).
+- PDFBox-Android 2.0.27.0.
+- Application ID: `com.nexauren.pdfmax`.
+- Version: `2.0.0` (`versionCode 12`).
+
+Release builds require the private upload keystore environment variables configured in GitHub Actions. A successful debug build is not the same as a signed release or a device-tested APK.
 
 ## Privacy policy
 
-- GitHub Pages URL (after enabling Pages with GitHub Actions): https://nexauren1.github.io/PDF-Max-PDF-Editor-Reader/privacy-policy.html
-- HTML page in the repository: [docs/privacy-policy.html](docs/privacy-policy.html)
-- Source policy: [PRIVACY_POLICY.md](PRIVACY_POLICY.md)
-- Deployment workflow: [pages.yml](.github/workflows/pages.yml). In Settings → Pages, choose **GitHub Actions** as the publishing source, then run the workflow.
-
-## Google Play policy note
-
-PDF Max requests Android All files access because its core document library discovers and manages compatible documents across shared device storage. Google Play treats `MANAGE_EXTERNAL_STORAGE` as a restricted, high-risk permission: submit the Permissions Declaration Form, explain why a document library's full-device indexing cannot be replaced by a user-selected Storage Access Framework flow, and wait for approval. Approval is not guaranteed. See [Google Play's All files access policy](https://support.google.com/googleplay/android-developer/answer/10467955).
-
-Prepare the [All files access declaration](GOOGLE_PLAY_PERMISSION_DECLARATION.md) and the bilingual [Google Play listing draft](PLAY_STORE_LISTING.md). Before Play submission, complete the [Google Play launch checklist](GOOGLE_PLAY_LAUNCH_CHECKLIST.md) and publish the [privacy policy](PRIVACY_POLICY.md) at a stable public URL.
+- [Privacy policy (HTML)](docs/privacy-policy.html)
+- [Privacy policy (Markdown)](PRIVACY_POLICY.md)
+- Public URL after GitHub Pages is enabled: https://nexauren1.github.io/PDF-Max-PDF-Editor-Reader/privacy-policy.html

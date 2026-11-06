@@ -72,7 +72,7 @@ jobs:
           test -n "$AAB_PATH" && test -s "$AAB_PATH"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK_PATH"
           BADGING="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK_PATH")"
-          printf '%s\n' "$BADGING" | grep -F "package: name='com.nexauren.pdfmax' versionCode='11' versionName='1.2.6'"
+          printf '%s\n' "$BADGING" | grep -F "package: name='com.nexauren.pdfmax' versionCode='12' versionName='2.0.0'"
           printf '%s\n' "$BADGING" | grep -F "sdkVersion:'26'"
           printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'36'"
           jarsigner -verify -verbose -certs "$AAB_PATH" >/dev/null
@@ -94,11 +94,11 @@ jobs:
           retention-days: 30
 
       - name: Publish stable GitHub release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish v1.2.6-rc1]')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish v2.0.0-rc1]')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.6-rc1
-          name: "PDF Max v1.2.6 Release Candidate 1"
+          tag_name: v2.0.0-rc1
+          name: "PDF Max v2.0.0 Release Candidate 1"
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           prerelease: true
@@ -107,7 +107,7 @@ jobs:
             app-release-verified.apk
             app-release-verified.aab
           body: |
-            PDF Max v1.2.6 Release Candidate 1.
+            PDF Max v2.0.0 Release Candidate 1.
             Automated unit tests, Android debug/release builds, upload-keystore validation and APK/AAB signature checks passed.
             Includes a signed universal APK for direct Android 13 device testing and a signed AAB for a later Google Play submission.
             This is a pre-release candidate, not a device-certified stable release. Physical-device regression testing, privacy review for All files access and store-policy approval remain outstanding.

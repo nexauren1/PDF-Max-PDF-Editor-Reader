@@ -1,1477 +1,1503 @@
 package com.nexauren.pdfmax.ui
 
-import android.net.Uri
+import android.content.Context
 import android.content.Intent
-import android.os.Build
-import android.provider.Settings
-import java.io.File
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.pdf.PdfRenderer
+import android.net.Uri
+import android.os.ParcelFileDescriptor
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import com.nexauren.pdfmax.R
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.nexauren.pdfmax.ui.theme.*
-import com.nexauren.pdfmax.data.DocumentKind
-import com.nexauren.pdfmax.data.DocumentScanner
-import com.nexauren.pdfmax.data.DocumentActions
-import com.nexauren.pdfmax.data.PdfOperations
-import com.nexauren.pdfmax.data.IndexedDocument
+import androidx.core.content.FileProvider
+import com.nexauren.pdfmax.data.DocumentStore
+import com.nexauren.pdfmax.data.PdfDocumentItem
+import com.nexauren.pdfmax.data.PdfEngine
+import com.nexauren.pdfmax.ui.theme.PDFMaxTheme
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.util.Locale
+import kotlin.math.roundToInt
 
-internal enum class Page { HOME, FILES, FAVORITES, RECENT, TRASH, TOOLS, READER, OFFICE, CREATE_PDF, EDITOR, CONVERTER, SCANNER, PROTECT, SETTINGS, TOOL }
-internal data class ToolSpec(val title: String, val subtitle: String, val icon: ImageVector, val color: Color, val page: Page = Page.TOOL)
+private enum class Screen {
+    ONBOARDING, HOME, FILES, TOOLS, FAVORITES, RECENT, TRASH, CREATE, COMPRESS,
+    MERGE, READER, WORKSPACE, SETTINGS, PROCESSING, RESULT
+}
 
-private val tools = listOf(
-    ToolSpec("Criar PDF", "Laboratório de escrita e layout", Icons.Default.Description, Color(0xFFE65A82), Page.CREATE_PDF),
-    ToolSpec("Editar PDF", "Sobreposição de texto em páginas PDF", Icons.Default.Edit, Color(0xFFFF3D79), Page.EDITOR),
-    ToolSpec("Converter PDF", "Word, Excel e imagem", Icons.Default.SwapHoriz, Color(0xFF2675FF), Page.CONVERTER),
-    ToolSpec("Comprimir PDF", "Regravar e otimizar; tamanho pode variar", Icons.Default.Compress, Color(0xFF18A96B)),
-    ToolSpec("Juntar PDF", "Combinar documentos", Icons.Default.MergeType, Color(0xFF9B4DFF)),
-    ToolSpec("Dividir PDF", "Separar por páginas", Icons.Default.CallSplit, Color(0xFFFF922E)),
-    ToolSpec("Proteger PDF", "Encriptação AES e palavra-passe de abertura", Icons.Default.Security, Color(0xFF11AFC0), Page.PROTECT),
-    ToolSpec("Assinar PDF", "Assinatura manuscrita visual", Icons.Default.Draw, Color(0xFF9A59FF)),
-    ToolSpec("Digitalizar e OCR", "Documento para PDF", Icons.Default.QrCodeScanner, Color(0xFF2ABF78), Page.SCANNER),
-    ToolSpec("Extrair imagens", "Guardar imagens", Icons.Default.Image, Color(0xFF18A5E8)),
-    ToolSpec("Adicionar texto", "Inserir texto", Icons.Default.TextFields, Color(0xFF17B7D3), Page.EDITOR),
-    ToolSpec("Marca de água", "Texto ou imagem", Icons.Default.WaterDrop, Color(0xFF527DFF)),
-    ToolSpec("Numerar páginas", "Cabeçalho e rodapé", Icons.Default.FormatListNumbered, Color(0xFF00B99A)),
-    ToolSpec("Rodar páginas", "Orientação do PDF", Icons.Default.RotateRight, Color(0xFF19B5A2)),
-    ToolSpec("Comparar PDFs", "Ver diferenças", Icons.Default.CompareArrows, Color(0xFFAA63F8)),
-    ToolSpec("Traduzir PDF", "Vários idiomas", Icons.Default.Translate, Color(0xFF3989F4)),
-    ToolSpec("Preencher formulários", "Campos e formulários", Icons.Default.EditNote, Color(0xFF4A8DFF)),
-    ToolSpec("Reparar PDF", "Tentar recuperar PDFs legíveis", Icons.Default.Refresh, Color(0xFF15B9A3)),
-    ToolSpec("PDF para imagem", "JPG e PNG", Icons.Default.Photo, Color(0xFFB05BF6)),
-    ToolSpec("Imagem para PDF", "JPG, PNG e mais", Icons.Default.Collections, Color(0xFF12A9D8)),
-    ToolSpec("Organizar páginas", "Reordenar e eliminar", Icons.Default.GridView, Color(0xFF168DFF)),
-    ToolSpec("Imprimir PDF", "Preparar impressão", Icons.Default.Print, Color(0xFF7C70F5)),
-    ToolSpec("Partilhar PDF", "Enviar documento", Icons.Default.Share, Color(0xFF16B89B)),
-    ToolSpec("Ver propriedades", "Informações do ficheiro", Icons.Default.Info, Color(0xFF4F8FEA)),
-    ToolSpec("Remover páginas", "Eliminar páginas selecionadas", Icons.Default.Delete, Color(0xFFEB5A74)),
-    ToolSpec("Extrair texto PDF", "Guardar texto como TXT", Icons.Default.TextSnippet, Color(0xFF1CBCD0)),
-    ToolSpec("Criar ZIP", "Arquivar vários ficheiros", Icons.Default.FolderZip, Color(0xFFE2A33D)),
-    ToolSpec("Detetar duplicados", "Encontrar cópias exatas", Icons.Default.ContentCopy, Color(0xFF9B6BFF)),
-    ToolSpec("Extrair páginas", "Criar um PDF com páginas escolhidas", Icons.Default.Description, Color(0xFF398BFF)),
-    ToolSpec("Adicionar página em branco", "Inserir uma nova página", Icons.Default.NoteAdd, Color(0xFF16B89B)),
-    ToolSpec("Editar metadados", "Título, autor e palavras-chave", Icons.Default.EditNote, Color(0xFFFF8A45)),
-    ToolSpec("Achatar formulários", "Transformar campos AcroForm em conteúdo fixo", Icons.Default.Layers, Color(0xFF17AFA0)),
-    ToolSpec("Remover metadados", "Limpar autor, título, datas e XMP do documento", Icons.Default.PrivacyTip, Color(0xFFE66A83)),
-    ToolSpec("Relatório do PDF", "Contagem de páginas, palavras e texto extraível", Icons.Default.Analytics, Color(0xFF5A91F3))
+private data class ResultFile(
+    val file: File,
+    val title: String,
+    val beforeBytes: Long? = null,
+    val mimeType: String = "application/pdf"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PDFMaxApp(initialPdf: Uri? = null) {
-    var screen by remember { mutableStateOf(if (initialPdf == null) Page.HOME else Page.READER) }
-    var previousScreen by remember { mutableStateOf(Page.HOME) }
-    var currentTool by remember { mutableStateOf(tools[0]) }
-    var pdfUri by remember { mutableStateOf(initialPdf) }
-    var selectedFile by remember { mutableStateOf<File?>(null) }
-    var pdfName by remember { mutableStateOf("Relatório_Final.pdf") }
-    val appContext = LocalContext.current
-    var english by remember {
-        mutableStateOf(
-            appContext.getSharedPreferences("pdfmax_preferences", android.content.Context.MODE_PRIVATE)
-                .getBoolean("english", false)
-        )
-    }
-    fun toggleLanguage() {
-        english = !english
-        appContext.getSharedPreferences("pdfmax_preferences", android.content.Context.MODE_PRIVATE)
-            .edit().putBoolean("english", english).apply()
-    }
-    val drawer = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    fun go(target: Page) {
-        if (target != screen) previousScreen = screen
-        screen = target
-        scope.launch { drawer.close() }
+    val scope = rememberCoroutineScope()
+    val store = remember(context) { DocumentStore(context) }
+    val prefs = remember(context) { context.getSharedPreferences("pdfmax_workspace", Context.MODE_PRIVATE) }
+
+    var dark by rememberSaveable { mutableStateOf(prefs.getBoolean("dark_theme", true)) }
+    var english by rememberSaveable { mutableStateOf(prefs.getBoolean("english", false)) }
+    var screen by rememberSaveable {
+        mutableStateOf(if (prefs.getBoolean("onboarding_done", false)) Screen.HOME else Screen.ONBOARDING)
     }
-    fun openTool(tool: ToolSpec) {
-        previousScreen = screen
-        currentTool = tool
-        screen = tool.page
-    }
-    fun backFromWorkspace() {
-        val destination = previousScreen
-        screen = destination
-        previousScreen = Page.HOME
-        scope.launch { drawer.close() }
-    }
-    fun openLocalFile(file: File) {
-        val libraryPrefs = appContext.getSharedPreferences("pdfmax_library", android.content.Context.MODE_PRIVATE)
-        val path = file.absolutePath
-        val recent = libraryPrefs.getString("recent_paths", "").orEmpty()
-            .split("\n").filter { it.isNotBlank() && it != path }
-        libraryPrefs.edit().putString("recent_paths", (listOf(path) + recent).take(50).joinToString("\n")).apply()
-        selectedFile = file
-        pdfName = file.name
-        pdfUri = Uri.fromFile(file)
-        screen = if (file.extension.equals("pdf", true)) Page.READER else Page.OFFICE
+    var welcomePage by rememberSaveable { mutableIntStateOf(0) }
+    var files by remember { mutableStateOf(store.listDocuments()) }
+    var trash by remember { mutableStateOf(store.listTrash()) }
+    var favorites by remember { mutableStateOf(store.favoritePaths()) }
+    var recentPaths by remember { mutableStateOf(store.recentPaths()) }
+    var selectedFile by remember { mutableStateOf<File?>(null) }
+    var mergeSelection by remember { mutableStateOf(listOf<String>()) }
+    var images by remember { mutableStateOf(listOf<Uri>()) }
+    var result by remember { mutableStateOf<ResultFile?>(null) }
+    var operationTitle by remember { mutableStateOf("") }
+    var operationDetail by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
+    var activeToolId by rememberSaveable { mutableStateOf("extract_pages") }
+    var showQuick by remember { mutableStateOf(false) }
+    var navigationBusy by remember { mutableStateOf(false) }
+    var navigationLabel by remember { mutableStateOf(if (english) "Opening workspace" else "A abrir espaço de trabalho") }
+    var processingBusy by remember { mutableStateOf(false) }
+    var navigationJob by remember { mutableStateOf<Job?>(null) }
+
+    val drawer = rememberDrawerState(DrawerValue.Closed)
+    val snackbar = remember { SnackbarHostState() }
+    val gearAnimation = rememberInfiniteTransition(label = "PDF Max gear")
+    val gearAngle by gearAnimation.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1050, easing = androidx.compose.animation.core.LinearEasing)
+        ),
+        label = "gear rotation"
+    )
+
+    fun refresh() {
+        files = store.listDocuments()
+        trash = store.listTrash()
+        favorites = store.favoritePaths()
+        recentPaths = store.recentPaths()
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawer,
-        scrimColor = Color(0xB8000616),
-        drawerContent = {
-            ModalDrawerSheet(
-                modifier = Modifier.width(302.dp),
-                drawerContainerColor = Color(0xFF09172D),
-                drawerContentColor = MaxText
-            ) {
-                SideMenu(screen, english, { go(it) }, { toggleLanguage() })
+    fun go(to: Screen) {
+        if (to == screen && !navigationBusy) {
+            if (drawer.isOpen) scope.launch { drawer.close() }
+            return
+        }
+        navigationJob?.cancel()
+        navigationJob = scope.launch {
+            navigationLabel = if (english) "Preparing " + to.name.lowercase(Locale.ROOT) else "A preparar " + to.name.lowercase(Locale.ROOT)
+            navigationBusy = true
+            delay(390)
+            screen = to
+            drawer.close()
+            delay(90)
+            navigationBusy = false
+        }
+    }
+
+    fun openPdf(file: File) {
+        selectedFile = file
+        store.recordOpened(file)
+        refresh()
+        go(Screen.READER)
+    }
+
+    fun shareFile(file: File, mimeType: String = "application/pdf", whatsappOnly: Boolean = false) {
+        runCatching {
+            val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (whatsappOnly) setPackage("com.whatsapp")
+            }
+            if (whatsappOnly && send.resolveActivity(context.packageManager) == null) {
+                shareFile(file, mimeType, false)
+            } else {
+                context.startActivity(Intent.createChooser(send, if (english) "Share file" else "Partilhar ficheiro"))
+            }
+        }.onFailure {
+            scope.launch { snackbar.showSnackbar(it.message ?: if (english) "Unable to share this file" else "Não foi possível partilhar este ficheiro") }
+        }
+    }
+
+    fun toggleFavorite(file: File) {
+        store.toggleFavorite(file)
+        refresh()
+    }
+
+    fun startOperation(
+        title: String,
+        detail: String,
+        beforeBytes: Long? = null,
+        mimeType: String = "application/pdf",
+        work: suspend () -> File
+    ) {
+        if (processingBusy) return
+        processingBusy = true
+        operationTitle = title
+        operationDetail = detail
+        navigationLabel = if (english) "Preparing operation" else "A preparar operação"
+        scope.launch {
+            navigationBusy = true
+            delay(360)
+            screen = Screen.PROCESSING
+            drawer.close()
+            navigationBusy = false
+            val started = System.currentTimeMillis()
+            try {
+                val output = work()
+                require(output.isFile && output.length() > 0L) { "The operation did not create a valid output file" }
+                val minimumDisplay = 700L
+                val remaining = minimumDisplay - (System.currentTimeMillis() - started)
+                if (remaining > 0) {
+                    operationDetail = if (english) "Finalizing and checking the output file…" else "A finalizar e verificar o ficheiro de saída…"
+                    delay(remaining)
+                }
+                result = ResultFile(output, title, beforeBytes, mimeType)
+                refresh()
+                navigationLabel = if (english) "Preparing your result" else "A preparar o resultado"
+                navigationBusy = true
+                delay(350)
+                screen = Screen.RESULT
+                navigationBusy = false
+            } catch (error: Throwable) {
+                navigationBusy = true
+                delay(300)
+                screen = Screen.HOME
+                navigationBusy = false
+                snackbar.showSnackbar(error.message ?: if (english) "The operation failed" else "A operação falhou")
+            } finally {
+                processingBusy = false
             }
         }
-    ) {
-        Scaffold(
-            containerColor = MaxNavy,
-            bottomBar = {
-                if (screen !in setOf(Page.READER, Page.OFFICE, Page.EDITOR, Page.CONVERTER, Page.SCANNER, Page.PROTECT, Page.TOOL)) {
-                    BottomBar(
-                        Modifier.fillMaxWidth(), screen, english,
-                        { go(Page.HOME) }, { go(Page.FILES) },
-                        { go(Page.CREATE_PDF) },
-                        { go(Page.FAVORITES) }, { scope.launch { drawer.open() } }
-                    )
+    }
+
+    fun createPdf() {
+        if (images.isEmpty()) return
+        startOperation(
+            if (english) "PDF created" else "PDF criado",
+            if (english) "Preparing pages from the selected photos" else "A preparar as páginas das fotografias selecionadas"
+        ) {
+            val output = store.newPdfFile("Photo_to_PDF")
+            withContext(Dispatchers.IO) { PdfEngine.createPdfFromImages(context, images, output) }
+            output
+        }
+    }
+
+    fun compressPdf(file: File) {
+        val before = file.length()
+        startOperation(
+            if (english) "Compress PDF" else "Comprimir PDF",
+            if (english) "Rebuilding the document and checking the actual output size" else "A reconstruir o documento e a verificar o tamanho real do resultado",
+            before
+        ) {
+            val output = store.newPdfFile(file.nameWithoutExtension + "_compressed")
+            withContext(Dispatchers.IO) { PdfEngine.rewritePdf(context, file, output) }
+            output
+        }
+    }
+
+    fun mergePdfs() {
+        val selected = mergeSelection.mapNotNull { path -> files.firstOrNull { it.file.absolutePath == path }?.file }
+        if (selected.size < 2) return
+        startOperation(
+            if (english) "PDFs merged" else "PDFs unidos",
+            if (english) "Combining " + selected.size + " documents in the chosen order" else "A combinar " + selected.size + " documentos pela ordem escolhida"
+        ) {
+            val output = store.newPdfFile("Merged_document")
+            withContext(Dispatchers.IO) { PdfEngine.mergePdfs(context, selected, output) }
+            output
+        }
+    }
+
+    fun runAdvancedTool(toolId: String, file: File, options: Map<String, String>) {
+        val outputExtension = when (toolId) {
+            "extract_text" -> "txt"
+            "to_images" -> "zip"
+            else -> "pdf"
+        }
+        val outputMime = when (outputExtension) {
+            "txt" -> "text/plain"
+            "zip" -> "application/zip"
+            else -> "application/pdf"
+        }
+        val title = when (toolId) {
+            "extract_pages" -> if (english) "Pages extracted" else "Páginas extraídas"
+            "remove_pages" -> if (english) "Pages removed" else "Páginas removidas"
+            "rotate" -> if (english) "Pages rotated" else "Páginas rodadas"
+            "watermark" -> if (english) "Watermark added" else "Marca de água adicionada"
+            "add_text" -> if (english) "Text added" else "Texto adicionado"
+            "page_numbers" -> if (english) "Pages numbered" else "Páginas numeradas"
+            "protect" -> if (english) "PDF protected" else "PDF protegido"
+            "unlock" -> if (english) "PDF unlocked" else "PDF desbloqueado"
+            "extract_text" -> if (english) "Text exported" else "Texto exportado"
+            "to_images" -> if (english) "Page images exported" else "Imagens das páginas exportadas"
+            else -> if (english) "PDF properties updated" else "Propriedades PDF atualizadas"
+        }
+        startOperation(
+            title,
+            if (english) "Applying the selected settings on this device" else "A aplicar as opções escolhidas neste dispositivo",
+            mimeType = outputMime
+        ) {
+            val output = store.newOutputFile(file.nameWithoutExtension + "_" + toolId, outputExtension)
+            withContext(Dispatchers.IO) {
+                when (toolId) {
+                    "extract_pages" -> PdfEngine.extractPages(context, file, options["range"].orEmpty(), output)
+                    "remove_pages" -> PdfEngine.removePages(context, file, options["range"].orEmpty(), output)
+                    "rotate" -> PdfEngine.rotatePages(context, file, options["degrees"]?.toIntOrNull() ?: 90, output)
+                    "watermark" -> PdfEngine.addWatermark(context, file, options["text"].orEmpty(), output)
+                    "add_text" -> PdfEngine.addTextOverlay(context, file, options["text"].orEmpty(), output)
+                    "page_numbers" -> PdfEngine.addPageNumbers(context, file, options["start"]?.toIntOrNull() ?: 1, output)
+                    "protect" -> PdfEngine.protectPdf(context, file, options["password"].orEmpty(), output)
+                    "unlock" -> PdfEngine.unlockPdf(context, file, options["password"].orEmpty(), output)
+                    "extract_text" -> PdfEngine.extractText(context, file, output)
+                    "to_images" -> PdfEngine.exportPagesAsPngZip(context, file, options["dpi"]?.toIntOrNull() ?: 144, output)
+                    "metadata" -> PdfEngine.updateMetadata(context, file, options["title"].orEmpty(), options["author"].orEmpty(), output)
+                    else -> error("Unknown PDF tool")
                 }
             }
-        ) { insets ->
-            Column(
-                Modifier.fillMaxSize().padding(insets)
-                    .background(Brush.verticalGradient(listOf(Color(0xFF071329), Color(0xFF08162B), Color(0xFF050E20))))
-            ) {
+            output
+        }
+    }
+
+    val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) scope.launch {
+            val imported = withContext(Dispatchers.IO) {
+                uris.mapNotNull { uri -> runCatching { store.importPdf(uri) }.getOrNull() }
+            }
+            refresh()
+            go(Screen.FILES)
+            snackbar.showSnackbar(if (english) imported.size.toString() + " PDF file(s) imported" else imported.size.toString() + " PDF(s) importado(s)")
+        }
+    }
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { selected ->
+        if (selected.isNotEmpty()) {
+            images = selected
+            go(Screen.CREATE)
+        }
+    }
+
+    var cameraOutput by remember { mutableStateOf<File?>(null) }
+    val cameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        val output = cameraOutput
+        if (saved && output != null && output.isFile && output.length() > 0L) {
+            images = images + Uri.fromFile(output)
+            go(Screen.CREATE)
+        }
+    }
+
+    fun launchCamera() {
+        runCatching {
+            val directory = File(context.cacheDir, "camera").apply { mkdirs() }
+            val output = File(directory, "scan_" + System.currentTimeMillis() + ".jpg")
+            val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", output)
+            cameraOutput = output
+            cameraPicker.launch(uri)
+        }.onFailure {
+            scope.launch { snackbar.showSnackbar(it.message ?: if (english) "Camera could not be opened" else "Não foi possível abrir a câmara") }
+        }
+    }
+
+    LaunchedEffect(initialPdf) {
+        if (initialPdf != null) {
+            val imported = withContext(Dispatchers.IO) { runCatching { store.importPdf(initialPdf) }.getOrNull() }
+            if (imported != null) {
+                refresh()
+                selectedFile = imported
+                store.recordOpened(imported)
+                prefs.edit().putBoolean("onboarding_done", true).apply()
+                go(Screen.READER)
+            }
+        }
+    }
+
+    BackHandler(enabled = (screen != Screen.HOME && screen != Screen.ONBOARDING) || drawer.isOpen || showQuick) {
+        when {
+            showQuick -> showQuick = false
+            drawer.isOpen -> scope.launch { drawer.close() }
+            else -> go(Screen.HOME)
+        }
+    }
+
+    PDFMaxTheme(darkTheme = dark) {
+        ModalNavigationDrawer(
+            drawerState = drawer,
+            scrimColor = Color(0x99020A18),
+            drawerContent = {
+                ModalDrawerSheet(
+                    modifier = Modifier.width(306.dp),
+                    drawerContainerColor = MaterialTheme.colorScheme.surface
+                ) {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            PdfMaxLogo(54)
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text("PDF Max", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                Text(if (english) "PDF Editor & Reader" else "Editor e leitor de PDF", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                            }
+                        }
+                        Spacer(Modifier.height(24.dp))
+                        DrawerItem(Icons.Default.Home, if (english) "Home" else "Início", screen == Screen.HOME) { go(Screen.HOME) }
+                        DrawerItem(Icons.Default.Folder, if (english) "My Files" else "Meus Arquivos", screen == Screen.FILES) { go(Screen.FILES) }
+                        DrawerItem(Icons.Default.Build, if (english) "Tools" else "Ferramentas", screen == Screen.TOOLS) { go(Screen.TOOLS) }
+                        DrawerItem(Icons.Default.Star, if (english) "Favorites" else "Favoritos", screen == Screen.FAVORITES) { go(Screen.FAVORITES) }
+                        DrawerItem(Icons.Default.History, if (english) "Recent" else "Recentes", screen == Screen.RECENT) { go(Screen.RECENT) }
+                        DrawerItem(Icons.Default.DeleteOutline, if (english) "Trash" else "Lixo", screen == Screen.TRASH) { go(Screen.TRASH) }
+                        HorizontalDivider(Modifier.padding(vertical = 14.dp))
+                        DrawerItem(Icons.Default.Settings, if (english) "Settings" else "Configurações", screen == Screen.SETTINGS) { go(Screen.SETTINGS) }
+                        DrawerItem(Icons.Default.HelpOutline, if (english) "Help & Support" else "Ajuda e suporte", false) {
+                            scope.launch { snackbar.showSnackbar(if (english) "Choose a tool to see its instructions." else "Escolhe uma ferramenta para ver as instruções.") }
+                            scope.launch { drawer.close() }
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Text(if (english) "LANGUAGE" else "IDIOMA", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(selected = !english, onClick = { english = false; prefs.edit().putBoolean("english", false).apply() }, label = { Text("PT  Português") })
+                            FilterChip(selected = english, onClick = { english = true; prefs.edit().putBoolean("english", true).apply() }, label = { Text("EN  English") })
+                        }
+                        Spacer(Modifier.height(14.dp))
+                        Text("PDF Max · 2.0", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterHorizontally), fontSize = 11.sp)
+                    }
+                }
+            }
+        ) {
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+                snackbarHost = { SnackbarHost(snackbar) },
+                bottomBar = {
+                    if (screen !in setOf(Screen.ONBOARDING, Screen.READER, Screen.PROCESSING, Screen.RESULT, Screen.WORKSPACE, Screen.MERGE, Screen.CREATE, Screen.COMPRESS, Screen.TRASH)) {
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                            NavigationBarItem(screen == Screen.HOME, { go(Screen.HOME) }, icon = { Icon(Icons.Default.Home, null) }, label = { Text(if (english) "Home" else "Início") })
+                            NavigationBarItem(screen == Screen.FILES, { go(Screen.FILES) }, icon = { Icon(Icons.Default.FolderOpen, null) }, label = { Text(if (english) "Files" else "Ficheiros") })
+                            NavigationBarItem(false, { showQuick = true }, icon = {
+                                Icon(Icons.Default.AddCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(33.dp))
+                            }, label = { Text(if (english) "Plus" else "Criar") })
+                            NavigationBarItem(screen == Screen.FAVORITES, { go(Screen.FAVORITES) }, icon = { Icon(Icons.Default.Star, null) }, label = { Text(if (english) "Favorites" else "Favoritos") })
+                            NavigationBarItem(false, { scope.launch { drawer.open() } }, icon = { Icon(Icons.Default.MoreHoriz, null) }, label = { Text(if (english) "More" else "Mais") })
+                        }
+                    }
+                }
+            ) { padding ->
                 AnimatedContent(
-                    targetState = screen to (if (screen == Page.TOOL) currentTool else tools.first()),
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    targetState = screen,
+                    modifier = Modifier.fillMaxSize().padding(padding),
                     transitionSpec = {
-                        (fadeIn(animationSpec = tween(220)) +
-                            slideInHorizontally(animationSpec = tween(220)) { width -> width / 18 }) togetherWith
-                            (fadeOut(animationSpec = tween(160)) +
-                                slideOutHorizontally(animationSpec = tween(160)) { width -> -width / 24 })
+                        (fadeIn() + slideInHorizontally { it / 18 }) togetherWith
+                            (fadeOut() + slideOutHorizontally { -it / 18 })
                     },
                     label = "PDF Max screen transition"
-                ) { destination ->
-                    val (targetPage, targetTool) = destination
-                    when (targetPage) {
-                        Page.HOME -> Dashboard(english, { go(it) }, { openTool(it) }, { go(Page.FILES) }, ::openLocalFile)
-                        Page.FILES -> DocumentLibraryScreen(english, ::openLocalFile)
-                        Page.FAVORITES -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Favorites")
-                        Page.RECENT -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Recent")
-                        Page.TRASH -> DocumentLibraryScreen(english, ::openLocalFile, initialFilter = "Trash")
-                        Page.OFFICE -> OfficePreviewScreen(selectedFile, english) { go(Page.FILES) }
-                        Page.TOOLS -> ToolsPage(english, { openTool(it) })
-                        Page.READER -> ReaderPage(english, pdfName, pdfUri, selectedFile, { go(Page.FILES) }, { go(Page.EDITOR) }, { openTool(it) })
-                        Page.CREATE_PDF -> PdfCreatorScreen(english)
-                        Page.EDITOR -> ToolWorkspaceScreen(tools.first { it.title == "Editar PDF" }, english, ::backFromWorkspace)
-                        Page.CONVERTER -> ToolWorkspaceScreen(tools.first { it.title == "Converter PDF" }, english, ::backFromWorkspace)
-                        Page.SCANNER -> ToolWorkspaceScreen(tools.first { it.title == "Digitalizar e OCR" }, english, ::backFromWorkspace)
-                        Page.PROTECT -> ToolWorkspaceScreen(tools.first { it.title == "Proteger PDF" }, english, ::backFromWorkspace)
-                        Page.SETTINGS -> SettingsPage(english, { toggleLanguage() })
-                        Page.TOOL -> ToolWorkspaceScreen(targetTool, english, ::backFromWorkspace)
+                ) { current ->
+                    when (current) {
+                        Screen.ONBOARDING -> WelcomeScreen(
+                            english = english,
+                            page = welcomePage,
+                            onPage = { welcomePage = it },
+                            onSkip = {
+                                prefs.edit().putBoolean("onboarding_done", true).apply()
+                                go(Screen.HOME)
+                            },
+                            onStart = {
+                                prefs.edit().putBoolean("onboarding_done", true).apply()
+                                go(Screen.HOME)
+                            }
+                        )
+                        Screen.HOME -> HomeScreen(
+                            english = english,
+                            files = files,
+                            favorites = favorites,
+                            onMenu = { scope.launch { drawer.open() } },
+                            onCreate = { images = emptyList(); go(Screen.CREATE) },
+                            onCompress = { go(Screen.COMPRESS) },
+                            onMerge = { go(Screen.MERGE) },
+                            onTools = { go(Screen.TOOLS) },
+                            onFiles = { go(Screen.FILES) },
+                            onOpen = ::openPdf,
+                            onFavorite = ::toggleFavorite
+                        )
+                        Screen.FILES, Screen.FAVORITES, Screen.RECENT -> {
+                            val visible = when (current) {
+                                Screen.FAVORITES -> files.filter { favorites.contains(it.file.absolutePath) }
+                                Screen.RECENT -> recentPaths.mapNotNull { path -> files.firstOrNull { it.file.absolutePath == path } }
+                                else -> files
+                            }
+                            LibraryScreen(
+                                english = english,
+                                title = when (current) {
+                                    Screen.FAVORITES -> if (english) "Favorites" else "Favoritos"
+                                    Screen.RECENT -> if (english) "Recent files" else "Ficheiros recentes"
+                                    else -> if (english) "My Files" else "Meus Arquivos"
+                                },
+                                files = visible,
+                                favorites = favorites,
+                                query = query,
+                                onQuery = { query = it },
+                                onMenu = { scope.launch { drawer.open() } },
+                                onImport = { pdfPicker.launch(arrayOf("application/pdf")) },
+                                onOpen = ::openPdf,
+                                onFavorite = ::toggleFavorite
+                            )
+                        }
+                        Screen.TOOLS -> ToolsCatalogScreen(
+                            english = english,
+                            onCreate = { images = emptyList(); go(Screen.CREATE) },
+                            onCompress = { go(Screen.COMPRESS) },
+                            onMerge = { go(Screen.MERGE) },
+                            onScan = ::launchCamera,
+                            onOpenTool = { activeToolId = it; go(Screen.WORKSPACE) },
+                            onFiles = { go(Screen.FILES) }
+                        )
+                        Screen.CREATE -> CreateScreen(
+                            english = english,
+                            images = images,
+                            onGallery = { imagePicker.launch("image/*") },
+                            onCamera = ::launchCamera,
+                            onScan = ::launchCamera,
+                            onCreate = ::createPdf,
+                            onRemove = { index -> images = images.filterIndexed { i, _ -> i != index } }
+                        )
+                        Screen.COMPRESS -> SelectPdfScreen(
+                            english = english,
+                            title = if (english) "Compress PDF" else "Comprimir PDF",
+                            subtitle = if (english) "Choose a PDF. The result will show the real size difference." else "Escolhe um PDF. O resultado mostrará a diferença real de tamanho.",
+                            files = files,
+                            onSelect = ::compressPdf,
+                            onImport = { pdfPicker.launch(arrayOf("application/pdf")) }
+                        )
+                        Screen.MERGE -> MergeScreen(
+                            english = english,
+                            files = files,
+                            selected = mergeSelection,
+                            onToggle = { path ->
+                                mergeSelection = if (mergeSelection.contains(path)) mergeSelection - path else mergeSelection + path
+                            },
+                            onMove = { path, delta ->
+                                val index = mergeSelection.indexOf(path)
+                                val target = index + delta
+                                if (index >= 0 && target in mergeSelection.indices) {
+                                    val updated = mergeSelection.toMutableList()
+                                    val value = updated.removeAt(index)
+                                    updated.add(target, value)
+                                    mergeSelection = updated
+                                }
+                            },
+                            onImport = { pdfPicker.launch(arrayOf("application/pdf")) },
+                            onMerge = ::mergePdfs,
+                            onBack = { go(Screen.HOME) }
+                        )
+                        Screen.READER -> selectedFile?.let { file ->
+                            ReaderScreen(
+                                english = english,
+                                file = file,
+                                favorite = favorites.contains(file.absolutePath),
+                                onBack = { go(Screen.FILES) },
+                                onShare = { shareFile(file) },
+                                onFavorite = { toggleFavorite(file) },
+                                onTools = { go(Screen.TOOLS) }
+                            )
+                        } ?: EmptyState(if (english) "No document selected" else "Nenhum documento selecionado", if (english) "Choose a PDF from My Files." else "Escolhe um PDF em Meus Arquivos.", if (english) "Open files" else "Abrir ficheiros") { go(Screen.FILES) }
+                        Screen.WORKSPACE -> ToolWorkspaceScreen(
+                            toolId = activeToolId,
+                            english = english,
+                            files = files,
+                            onBack = { go(Screen.TOOLS) },
+                            onImport = { pdfPicker.launch(arrayOf("application/pdf")) },
+                            onExecute = { file, options -> runAdvancedTool(activeToolId, file, options) }
+                        )
+                        Screen.SETTINGS -> SettingsScreen(
+                            english = english,
+                            dark = dark,
+                            storage = store.storageUsedBytes(),
+                            onLanguage = {
+                                english = !english
+                                prefs.edit().putBoolean("english", english).apply()
+                            },
+                            onTheme = {
+                                dark = !dark
+                                prefs.edit().putBoolean("dark_theme", dark).apply()
+                            }
+                        )
+                        Screen.TRASH -> TrashScreen(
+                            english = english,
+                            items = trash,
+                            onBack = { go(Screen.HOME) },
+                            onRestore = { file -> store.restoreFromTrash(file); refresh() },
+                            onDelete = { file -> store.permanentlyDelete(file); refresh() }
+                        )
+                        Screen.PROCESSING -> ProcessingScreen(english, operationTitle, operationDetail, gearAngle)
+                        Screen.RESULT -> result?.let { item ->
+                            ResultScreen(
+                                english = english,
+                                result = item,
+                                onShare = { shareFile(item.file, item.mimeType) },
+                                onWhatsapp = { shareFile(item.file, item.mimeType, true) },
+                                onOpen = if (item.mimeType == "application/pdf") ({ selectedFile = item.file; store.recordOpened(item.file); refresh(); go(Screen.READER) }) else null,
+                                onDone = { refresh(); go(Screen.FILES) }
+                            )
+                        } ?: EmptyState("PDF Max", "", if (english) "Home" else "Início") { go(Screen.HOME) }
                     }
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun TopBar(screen: Page, english: Boolean, onMenu: () -> Unit, onBack: () -> Unit, onSettings: () -> Unit) {
-    val root = screen == Page.HOME || screen == Page.FILES || screen == Page.TOOLS
-    Row(Modifier.fillMaxWidth().height(62.dp).padding(horizontal = 15.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = if (root) onMenu else onBack) {
-            Icon(if (root) Icons.Default.Menu else Icons.Default.ArrowBack, null, tint = Color.White)
-        }
-        Image(
-            painter = painterResource(R.drawable.ic_pdfmax),
-            contentDescription = "PDF Max",
-            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(11.dp))
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text("PDF Max", fontSize = 18.sp, color = Color.White, fontWeight = FontWeight.Bold)
-            Text(if (english) "PDF Editor & Reader" else "Editor e Leitor de PDF", fontSize = 10.sp, color = MaxMuted)
-        }
-        IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, null, tint = Color(0xFFC1D2EE)) }
-    }
-}
-
-@Composable
-private fun Dashboard(en: Boolean, navigate: (Page) -> Unit, choose: (ToolSpec) -> Unit, openPdf: () -> Unit, openFile: (File) -> Unit) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val scope = rememberCoroutineScope()
-    var storageAccess by remember { mutableStateOf(DocumentScanner.hasAccess(context)) }
-    var recentDocuments by remember { mutableStateOf(DocumentScanner.cachedDocuments().take(5)) }
-
-    fun openStorageSettings() {
-        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + context.packageName))
-        } else {
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.packageName))
-        }
-        runCatching { context.startActivity(intent) }.onFailure {
-            runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
-        }
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                val newlyGranted = !storageAccess && DocumentScanner.hasAccess(context)
-                val granted = DocumentScanner.hasAccess(context)
-                storageAccess = granted
-                if (granted) {
-                    scope.launch {
-                        recentDocuments = withContext(Dispatchers.IO) {
-                            // A full reconciliation is needed only on the first grant.
-                            // Normal resumes reuse the cached index and incremental refresh.
-                            DocumentScanner.scan(context, forceRefresh = newlyGranted)
-                        }.take(5)
-                    }
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    LaunchedEffect(Unit) {
-        // Load the saved library first, then refresh MediaStore in the background.
-        val saved = withContext(Dispatchers.IO) { DocumentScanner.loadPersistent(context) }
-        recentDocuments = saved.take(5)
-        val latest = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
-        recentDocuments = latest.take(5)
-        while (true) {
-            delay(DocumentScanner.REFRESH_INTERVAL_MS)
-            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                val updated = withContext(Dispatchers.IO) { DocumentScanner.scan(context) }
-                recentDocuments = updated.take(5)
-            }
-        }
-    }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 7.dp)) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                painter = painterResource(R.drawable.ic_pdfmax),
-                contentDescription = "PDF Max",
-                modifier = Modifier.size(45.dp).clip(RoundedCornerShape(13.dp))
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text("PDF Max", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                Text(
-                    if (en) "PDF EDITOR & READER" else "EDITOR E LEITOR DE PDF",
-                    color = Color(0xFF8FA9CE), fontSize = 8.sp,
-                    fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp
-                )
-            }
-            Row(
-                Modifier.clip(CircleShape)
-                    .background(Color(0xFF352A0B))
-                    .border(1.dp, Color(0xFFFFD45B).copy(alpha = 0.65f), CircleShape)
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.Star, null, tint = Color(0xFFFFD45B), modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("PRO", color = Color(0xFFFFD45B), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-            }
-            IconButton(onClick = { navigate(Page.SETTINGS) }) {
-                Icon(Icons.Default.Settings, if (en) "Settings" else "Definições", tint = Color(0xFFB5C7E2))
+        if (showQuick) {
+            ModalBottomSheet(onDismissRequest = { showQuick = false }, containerColor = MaterialTheme.colorScheme.surface) {
+                Text(if (english) "Quick actions" else "Ações rápidas", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp))
+                QuickAction(Icons.Default.Compress, if (english) "Compress PDF" else "Comprimir PDF") { showQuick = false; go(Screen.COMPRESS) }
+                QuickAction(Icons.Default.MergeType, if (english) "Merge PDFs" else "Juntar PDFs") { showQuick = false; go(Screen.MERGE) }
+                QuickAction(Icons.Default.AddPhotoAlternate, if (english) "Photo to PDF" else "Fotografia para PDF") { showQuick = false; images = emptyList(); go(Screen.CREATE) }
+                Spacer(Modifier.height(22.dp))
             }
         }
 
-        SearchBar(if (en) "Search files and folders…" else "Pesquisar ficheiros e pastas…") {
-            navigate(Page.FILES)
-        }
-
-        if (!storageAccess) {
-            Spacer(Modifier.height(11.dp))
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF17304D))
-                    .border(1.dp, Color(0xFF3B638B), RoundedCornerShape(14.dp))
-                    .padding(11.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.FolderSpecial, null, tint = Color(0xFF8BD6FF), modifier = Modifier.size(28.dp))
-                Spacer(Modifier.width(9.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(if (en) "Enable document access" else "Ative o acesso aos documentos", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        if (en) "Needed to find PDFs, Word and other files on this device." else "Necessário para localizar PDFs, Word e outros ficheiros neste dispositivo.",
-                        color = MaxMuted, fontSize = 9.sp, lineHeight = 13.sp
-                    )
-                }
-                TextButton(onClick = { openStorageSettings() }) {
-                    Text(if (en) "Allow" else "Ativar", color = Color(0xFF8BD6FF), fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(13.dp))
-        Box(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(19.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF32117B), Color(0xFF123D9A), Color(0xFF075C82))))
-                .border(1.dp, Color(0xFF347DFF), RoundedCornerShape(19.dp))
-                .padding(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        if (en) "YOUR COMPLETE PDF ASSISTANT" else "O SEU ASSISTENTE COMPLETO DE PDF",
-                        color = Color(0xFFC7BCFF), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.5.sp
-                    )
-                    Spacer(Modifier.height(7.dp))
-                    Text(
-                        if (en) "All your PDF tools in one place" else "Todas as ferramentas num só lugar",
-                        color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold,
-                        lineHeight = 21.sp
-                    )
-                    Spacer(Modifier.height(5.dp))
-                    Text(
-                        if (en) "Edit, convert, protect and organise documents with one workspace." else "Edite, converta, proteja e organize os seus documentos num único espaço.",
-                        color = Color(0xFFD8E5FF), fontSize = 10.sp, lineHeight = 14.sp
-                    )
-                    Spacer(Modifier.height(11.dp))
-                    Row(
-                        Modifier.clip(CircleShape)
-                            .background(Color(0xFF087FF1))
-                            .clickable { navigate(Page.TOOLS) }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(if (en) "Explore all tools" else "Explorar ferramentas", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.width(5.dp))
-                        Icon(Icons.Default.ArrowForward, null, tint = Color.White, modifier = Modifier.size(13.dp))
-                    }
-                }
-                Spacer(Modifier.width(8.dp))
-                Box(
-                    Modifier.size(76.dp).clip(RoundedCornerShape(22.dp))
-                        .background(Brush.linearGradient(listOf(Color(0xFF9C56FF), Color(0xFF126CFF), Color(0xFF0BD4FF)))),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.PictureAsPdf, null, tint = Color.White, modifier = Modifier.size(49.dp))
-                }
-            }
-        }
-
-        Spacer(Modifier.height(17.dp))
-        SectionTitle(if (en) "Main tools" else "Ferramentas principais", if (en) "See all" else "Ver todas") {
-            navigate(Page.TOOLS)
-        }
-        ToolGrid(
-            listOf(tools[1], tools[2], tools[3], tools[4], tools[5], tools[6]),
-            choose,
-            en
-        )
-        Spacer(Modifier.height(17.dp))
-        SectionTitle(if (en) "Recent files" else "Arquivos recentes", if (en) "View all" else "Ver todos") {
-            navigate(Page.FILES)
-        }
-        if (recentDocuments.isEmpty()) {
-            Text(if (en) "Your recent documents will appear here after enabling the file library." else "Os documentos recentes aparecerão aqui depois de ativar a biblioteca de ficheiros.", color = MaxMuted, fontSize = 10.sp, lineHeight = 15.sp)
-        } else {
-            recentDocuments.forEach { item ->
-                val accent = when (item.kind) {
-                    DocumentKind.PDF -> Color(0xFFFF477A)
-                    DocumentKind.WORD -> Color(0xFF398BFF)
-                    DocumentKind.EXCEL -> Color(0xFF1CC99A)
-                    DocumentKind.POWERPOINT -> Color(0xFFFF9B3D)
-                    DocumentKind.IMAGE -> Color(0xFF9D62F5)
-                    else -> Color(0xFF24B9C7)
-                }
-                RecentRow(item.name, item.sizeLabel + "  •  " + item.extension.uppercase(), accent) { openFile(item.file) }
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.FolderOpen, null, tint = MaxCyan)
-            Spacer(Modifier.width(8.dp))
-            Text(if (en) "Open a PDF from your device" else "Abrir um PDF do dispositivo", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = openPdf) { Text(if (en) "Open" else "Abrir", color = MaxCyan) }
-        }
-        Spacer(Modifier.height(14.dp))
-    }
-}
-
-@Composable
-private fun SectionTitle(title: String, action: String, onAction: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Spacer(Modifier.weight(1f))
-        TextButton(onClick = onAction, contentPadding = PaddingValues(4.dp)) {
-            Text(action, color = MaxCyan, fontSize = 11.sp)
-            Icon(Icons.Default.ChevronRight, null, tint = MaxCyan, modifier = Modifier.size(15.dp))
-        }
-    }
-}
-
-@Composable
-private fun ToolGrid(list: List<ToolSpec>, onChoose: (ToolSpec) -> Unit, english: Boolean = false) {
-    // Three vivid columns, matching the reference screens while keeping touch
-    // targets large enough for compact Android phones.
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        list.chunked(3).forEach { row ->
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(9.dp)
-            ) {
-                row.forEach { tool ->
-                    ToolTile(tool, Modifier.weight(1f), english) { onChoose(tool) }
-                }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ToolTile(
-    tool: ToolSpec,
-    modifier: Modifier = Modifier,
-    english: Boolean = false,
-    click: () -> Unit
-) {
-    Column(
-        modifier.fillMaxWidth().heightIn(min = 112.dp)
-            .clip(RoundedCornerShape(17.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        tool.color.copy(alpha = 0.92f),
-                        tool.color.copy(alpha = 0.58f),
-                        Color(0xFF111A36)
-                    )
-                )
-            )
-            .border(1.dp, tool.color.copy(alpha = 0.82f), RoundedCornerShape(17.dp))
-            .clickable(onClick = click)
-            .padding(horizontal = 5.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            Modifier.size(43.dp).clip(RoundedCornerShape(13.dp))
-                .background(Color.White.copy(alpha = 0.17f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(tool.icon, null, tint = Color.White, modifier = Modifier.size(25.dp))
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            localizedToolTitle(tool.title, english),
-            color = Color.White,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            maxLines = 2,
-            lineHeight = 11.sp,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun RecentRow(name: String, detail: String, color: Color, click: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = click).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(39.dp).clip(RoundedCornerShape(11.dp)).background(color.copy(alpha = 0.20f)), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.PictureAsPdf, null, tint = color, modifier = Modifier.size(23.dp))
-        }
-        Spacer(Modifier.width(11.dp))
-        Column(Modifier.weight(1f)) {
-            Text(name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(detail, color = MaxMuted, fontSize = 10.sp)
-        }
-        Icon(Icons.Default.MoreVert, null, tint = MaxMuted)
-    }
-    Divider(color = Color(0xFF1B2D49))
-}
-
-@Composable
-private fun FilesPage(en: Boolean, fileName: String, openPdf: () -> Unit, openReader: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
-        PageTitle(if (en) "My files" else "Meus Arquivos", if (en) "Your documents, organized in one place" else "Os seus documentos organizados num só lugar")
-        SearchBar(if (en) "Search files and folders…" else "Pesquisar arquivos e pastas…") {}
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            listOf(if (en) "All" else "Todos", "PDF", if (en) "Documents" else "Documentos", if (en) "Images" else "Imagens").forEachIndexed { i, label ->
-                Box(Modifier.clip(CircleShape).background(if (i == 0) Color(0xFF087EEB) else Color(0xFF172A47)).padding(horizontal = 13.dp, vertical = 8.dp)) {
-                    Text(label, color = Color.White, fontSize = 10.sp)
-                }
-            }
-        }
-        Spacer(Modifier.height(18.dp))
-        Text(if (en) "FOLDERS" else "PASTAS", color = MaxMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        listOf(
-            Triple(if (en) "Documents" else "Documentos", "12 itens", Color(0xFF3F9DFF)),
-            Triple(if (en) "Projects" else "Projetos", "8 itens", Color(0xFFFFB23F)),
-            Triple(if (en) "Images" else "Imagens", "24 itens", Color(0xFF18BFA7)),
-            Triple(if (en) "Downloads" else "Transferências", "6 itens", Color(0xFF9B68F4))
-        ).forEach { folder ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Folder, null, tint = folder.third, modifier = Modifier.size(31.dp))
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(folder.first, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    Text(folder.second, color = MaxMuted, fontSize = 10.sp)
-                }
-                Icon(Icons.Default.ChevronRight, null, tint = MaxMuted)
-            }
-            Divider(color = Color(0xFF1A2B47))
-        }
-        Spacer(Modifier.height(17.dp))
-        SectionTitle(if (en) "Recent documents" else "Documentos recentes", if (en) "Import" else "Importar", openPdf)
-        RecentRow(fileName, "2.4 MB  •  PDF", Color(0xFFFF477A), openReader)
-        RecentRow("Apresentação.pdf", "5.8 MB  •  PDF", Color(0xFF9D62F5), openReader)
-        RecentRow("Contrato.pdf", "1.2 MB  •  PDF", Color(0xFF1CC99A), openReader)
-        Spacer(Modifier.height(16.dp))
-        PrimaryAction(if (en) "Import PDF" else "Importar PDF", Icons.Default.UploadFile, openPdf)
-    }
-}
-
-private fun toolCategory(title: String): String = when (title) {
-    "Editar PDF", "Adicionar texto", "Marca de água", "Assinar PDF", "Preencher formulários", "Editar metadados" -> "Edit"
-    "Achatar formulários", "Remover metadados" -> "Security"
-    "Relatório do PDF" -> "Utilities"
-    "Juntar PDF", "Dividir PDF", "Organizar páginas", "Remover páginas", "Extrair páginas",
-    "Adicionar página em branco", "Rodar páginas" -> "Organize"
-    "Converter PDF", "PDF para imagem", "Imagem para PDF", "Extrair imagens", "Extrair texto PDF", "Criar PDF" -> "Convert"
-    "Proteger PDF" -> "Security"
-    "Digitalizar e OCR" -> "Scan"
-    else -> "Utilities"
-}
-
-@Composable
-private fun ToolsPage(en: Boolean, choose: (ToolSpec) -> Unit) {
-    var query by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("All") }
-    val categories = listOf("All", "Edit", "Organize", "Convert", "Security", "Scan", "Utilities")
-    val categoryLabels = categories.associateWith { key ->
-        when (key) {
-            "All" -> if (en) "All tools" else "Todas"
-            "Edit" -> if (en) "Edit" else "Editar"
-            "Organize" -> if (en) "Organize" else "Organizar"
-            "Convert" -> if (en) "Convert" else "Converter"
-            "Security" -> if (en) "Security" else "Segurança"
-            "Scan" -> if (en) "Scan & OCR" else "Digitalizar e OCR"
-            else -> if (en) "Utilities" else "Utilitários"
-        }
-    }
-    val categoryTools = tools.filter { selectedCategory == "All" || toolCategory(it.title) == selectedCategory }
-    val visibleTools = categoryTools.filter {
-        query.isBlank() || it.title.contains(query, true) || it.subtitle.contains(query, true) ||
-            localizedToolTitle(it.title, en).contains(query, true) ||
-            localizedToolSubtitle(it.title, en).contains(query, true)
-    }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
-        PageTitle(
-            if (en) "All tools" else "Todas as ferramentas",
-            if (en) "A complete workspace for PDF documents" else "Um espaço completo para trabalhar com documentos PDF"
-        )
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF142F57), Color(0xFF10213B))))
-                .border(1.dp, Color(0xFF294C7B), RoundedCornerShape(16.dp))
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        if (navigationBusy) {
             Box(
-                Modifier.size(43.dp).clip(RoundedCornerShape(13.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF168DEB), Color(0xFF7555F6)))),
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.97f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(28.dp)) {
+                    Icon(Icons.Default.Settings, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(68.dp).rotate(gearAngle))
+                    Spacer(Modifier.height(18.dp))
+                    Text(navigationLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Text("PDF Max", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun WelcomeScreen(
+    english: Boolean,
+    page: Int,
+    onPage: (Int) -> Unit,
+    onSkip: () -> Unit,
+    onStart: () -> Unit
+) {
+    val headings = if (english) listOf(
+        "Your PDFs, all in one place",
+        "Create, compress and combine",
+        "Read, organise and protect"
+    ) else listOf(
+        "Os teus PDFs, num só lugar",
+        "Cria, comprime e junta",
+        "Lê, organiza e protege"
+    )
+    val descriptions = if (english) listOf(
+        "A focused document workspace designed to make everyday PDF tasks feel simple.",
+        "Turn photos into PDFs, reduce file size and bring documents together in the order you choose.",
+        "Preview every page, keep favourite files close and use dedicated tools when you need them."
+    ) else listOf(
+        "Um espaço de documentos pensado para tornar as tarefas PDF do dia a dia mais simples.",
+        "Transforma fotografias em PDF, reduz o tamanho e junta documentos pela ordem que escolheres.",
+        "Pré-visualiza páginas, guarda favoritos e utiliza ferramentas próprias para cada tarefa."
+    )
+    val icons = listOf(Icons.Default.PictureAsPdf, Icons.Default.AutoAwesome, Icons.Default.FolderOpen)
+
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            PdfMaxLogo(43)
+            Spacer(Modifier.width(10.dp))
+            Text("PDF Max", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onSkip) { Text(if (english) "Skip" else "Saltar") }
+        }
+
+        Spacer(Modifier.weight(1f))
+        androidx.compose.animation.AnimatedContent(
+            targetState = page.coerceIn(0, 2),
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInHorizontally { it / 5 }) togetherWith
+                    (androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutHorizontally { -it / 5 })
+            },
+            label = "Welcome slides"
+        ) { current ->
+            Column(
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().height(300.dp)
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF142E62), Color(0xFF101C3E), Color(0xFF064D68))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        Modifier.size(188.dp)
+                            .background(
+                                Brush.linearGradient(listOf(Color(0xFF0ECDE5), Color(0xFF2877EA))),
+                                RoundedCornerShape(42.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(icons[current], null, tint = Color.White, modifier = Modifier.size(104.dp))
+                    }
+                    Text(
+                        "PDF",
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(22.dp),
+                        color = Color(0xFF8AEFFF),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 20.sp,
+                        letterSpacing = 2.sp
+                    )
+                }
+                Spacer(Modifier.height(35.dp))
+                Text(headings[current], style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(10.dp))
+                Text(descriptions[current], color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, lineHeight = 22.sp, fontSize = 14.sp)
+            }
+        }
+        Spacer(Modifier.height(28.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            repeat(3) { index ->
+                Box(
+                    Modifier.size(if (index == page) 11.dp else 9.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (index == page) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)
+                        .clickable { onPage(index) }
+                )
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Button(
+            onClick = {
+                if (page < 2) onPage(page + 1) else onStart()
+            },
+            modifier = Modifier.fillMaxWidth().height(62.dp),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Text(
+                if (page < 2) (if (english) "Continue" else "Continuar")
+                else (if (english) "Start Now" else "Começar agora"),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Text(
+            if (english) "Free · no account required" else "Gratuito · sem necessidade de conta",
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 12.sp
+        )
+    }
+}
+
+@Composable
+private fun PdfMaxLogo(size: Int) {
+    Box(
+        Modifier.size(size.dp).clip(RoundedCornerShape(17.dp))
+            .background(Brush.linearGradient(listOf(Color(0xFF0CCDE6), Color(0xFF2877EA)))),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(Icons.Default.InsertDriveFile, null, tint = Color.White, modifier = Modifier.size((size * 0.56f).dp))
+        Icon(Icons.Default.Check, null, tint = Color(0xFF07305D), modifier = Modifier.align(Alignment.BottomEnd).padding(7.dp).size(15.dp))
+    }
+}
+
+@Composable
+private fun DrawerItem(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, selected: Boolean, onClick: () -> Unit) {
+    NavigationDrawerItem(
+        label = { Text(title, fontWeight = FontWeight.SemiBold) },
+        icon = { Icon(icon, null) },
+        selected = selected,
+        onClick = onClick,
+        modifier = Modifier.padding(vertical = 2.dp),
+        shape = RoundedCornerShape(13.dp)
+    )
+}
+
+@Composable
+private fun ScreenHeader(title: String, english: Boolean, onMenu: (() -> Unit)? = null, onBack: (() -> Unit)? = null, action: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 7.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, if (english) "Back" else "Voltar") }
+        else IconButton(onClick = { onMenu?.invoke() }) { Icon(Icons.Default.Menu, if (english) "Menu" else "Menu") }
+        Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (action != null) IconButton(onClick = action) { Icon(Icons.Default.Add, if (english) "Add" else "Adicionar") }
+    }
+}
+
+@Composable
+private fun HomeScreen(
+    english: Boolean,
+    files: List<PdfDocumentItem>,
+    favorites: Set<String>,
+    onMenu: () -> Unit,
+    onCreate: () -> Unit,
+    onCompress: () -> Unit,
+    onMerge: () -> Unit,
+    onTools: () -> Unit,
+    onFiles: () -> Unit,
+    onOpen: (File) -> Unit,
+    onFavorite: (File) -> Unit
+) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 7.dp, bottom = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            PdfMaxLogo(46)
+            Spacer(Modifier.width(11.dp))
+            Column(Modifier.weight(1f)) {
+                Text("PDF Max", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(if (english) "PDF Editor & Reader" else "Editor e leitor de PDF", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+            IconButton(onClick = onMenu) { Icon(Icons.Default.Menu, if (english) "Open menu" else "Abrir menu") }
+        }
+        Text(if (english) "What would you like to do?" else "O que gostarias de fazer?", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(if (english) "Your documents, ready for the next step." else "Os teus documentos, prontos para o próximo passo.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+            HomeActionCard(Icons.Default.Compress, if (english) "Compress PDF" else "Comprimir PDF", if (english) "Reduce file size" else "Reduzir tamanho", Modifier.weight(1f), onCompress)
+            HomeActionCard(Icons.Default.MergeType, if (english) "Merge PDF" else "Juntar PDFs", if (english) "Combine files" else "Unir ficheiros", Modifier.weight(1f), onMerge)
+            HomeActionCard(Icons.Default.AddPhotoAlternate, if (english) "Create PDF" else "Criar PDF", if (english) "From photos" else "De fotografias", Modifier.weight(1f), onCreate)
+        }
+        Spacer(Modifier.height(26.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (english) "Recent files" else "Ficheiros recentes", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onFiles) { Text(if (english) "See all" else "Ver todos") }
+        }
+        if (files.isEmpty()) {
+            EmptyCard(
+                title = if (english) "Your library is ready" else "A tua biblioteca está pronta",
+                detail = if (english) "Import a PDF or create one from photos to get started." else "Importa um PDF ou cria um a partir de fotografias para começar.",
+                action = if (english) "Explore tools" else "Explorar ferramentas",
+                onClick = onTools
+            )
+        } else {
+            files.take(4).forEach { item ->
+                DocumentRow(item, favorites.contains(item.file.absolutePath), onOpen = { onOpen(item.file) }, onFavorite = { onFavorite(item.file) })
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        Card(
+            onClick = onTools,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Row(Modifier.fillMaxWidth().padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(30.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(if (english) "Explore all tools" else "Explorar todas as ferramentas", fontWeight = FontWeight.Bold)
+                    Text(if (english) "A dedicated workspace for every operation" else "Um espaço próprio para cada operação", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                }
+                Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun HomeActionCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, modifier: Modifier, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.height(145.dp),
+        shape = RoundedCornerShape(19.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(Modifier.fillMaxSize().padding(9.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Box(
+                Modifier.size(45.dp).background(Brush.linearGradient(listOf(Color(0xFF10CDE3), Color(0xFF2877EA))), RoundedCornerShape(15.dp)),
+                contentAlignment = Alignment.Center
+            ) { Icon(icon, null, tint = Color.White, modifier = Modifier.size(25.dp)) }
+            Spacer(Modifier.height(8.dp))
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 2)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, textAlign = TextAlign.Center, maxLines = 2)
+        }
+    }
+}
+
+@Composable
+private fun LibraryScreen(
+    english: Boolean,
+    title: String,
+    files: List<PdfDocumentItem>,
+    favorites: Set<String>,
+    query: String,
+    onQuery: (String) -> Unit,
+    onMenu: () -> Unit,
+    onImport: () -> Unit,
+    onOpen: (File) -> Unit,
+    onFavorite: (File) -> Unit
+) {
+    val visible = files.filter { it.name.contains(query, ignoreCase = true) }
+    Column(Modifier.fillMaxSize()) {
+        ScreenHeader(title, english, onMenu = onMenu, action = onImport)
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQuery,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Default.Search, null) },
+            placeholder = { Text(if (english) "Search PDFs…" else "Pesquisar PDFs…") },
+            shape = RoundedCornerShape(17.dp)
+        )
+        Spacer(Modifier.height(10.dp))
+        StorageSummary(files, english)
+        if (visible.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                EmptyState(
+                    if (english) "No PDFs found" else "Nenhum PDF encontrado",
+                    if (english) "Import a document to add it to your library." else "Importa um documento para o adicionar à biblioteca.",
+                    if (english) "Import PDF" else "Importar PDF",
+                    onImport
+                )
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(13.dp),
+                horizontalArrangement = Arrangement.spacedBy(11.dp),
+                verticalArrangement = Arrangement.spacedBy(11.dp)
+            ) {
+                items(visible, key = { it.file.absolutePath }) { item ->
+                    DocumentTile(item, favorites.contains(item.file.absolutePath), onOpen = { onOpen(item.file) }, onFavorite = { onFavorite(item.file) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StorageSummary(files: List<PdfDocumentItem>, english: Boolean) {
+    val bytes = files.sumOf { it.sizeBytes }
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp),
+        shape = RoundedCornerShape(17.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(13.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(if (english) "PDF Max storage" else "Armazenamento PDF Max", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Spacer(Modifier.weight(1f))
+                Text(formatBytes(bytes), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+            Text(if (english) "Space used by documents saved inside PDF Max" else "Espaço ocupado pelos documentos guardados no PDF Max", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
+        }
+    }
+}
+
+@Composable
+private fun DocumentTile(item: PdfDocumentItem, favorite: Boolean, onOpen: () -> Unit, onFavorite: () -> Unit) {
+    Card(
+        onClick = onOpen,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(10.dp)) {
+            Box(
+                Modifier.fillMaxWidth().height(155.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFF7F9FC)),
+                contentAlignment = Alignment.Center
+            ) {
+                PdfPagePreview(item.file, 0, Modifier.fillMaxSize().padding(8.dp))
+                IconButton(onClick = onFavorite, modifier = Modifier.align(Alignment.TopEnd)) {
+                    Icon(if (favorite) Icons.Default.Star else Icons.Default.StarBorder, null, tint = if (favorite) Color(0xFFFFC857) else Color(0xFF61718D))
+                }
+            }
+            Spacer(Modifier.height(9.dp))
+            Text(item.name, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(formatBytes(item.sizeBytes) + " · " + item.formattedDate, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun DocumentRow(item: PdfDocumentItem, favorite: Boolean, onOpen: () -> Unit, onFavorite: () -> Unit) {
+    Card(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        shape = RoundedCornerShape(17.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Row(Modifier.fillMaxWidth().padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(width = 58.dp, height = 72.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF7F9FC)), contentAlignment = Alignment.Center) {
+                PdfPagePreview(item.file, 0, Modifier.fillMaxSize().padding(4.dp))
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(if (en) "Your document toolkit" else "O seu conjunto de ferramentas", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Text(
-                    if (en) "${tools.size} tools · Pick a category to get started" else "${tools.size} ferramentas · Escolha uma categoria para começar",
-                    color = MaxMuted, fontSize = 10.sp
-                )
+                Text(item.name, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(formatBytes(item.sizeBytes) + " · " + item.formattedDate, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
             }
-            Icon(Icons.Default.GridView, null, tint = MaxCyan, modifier = Modifier.size(22.dp))
+            IconButton(onClick = onFavorite) { Icon(if (favorite) Icons.Default.Star else Icons.Default.StarBorder, null, tint = if (favorite) Color(0xFFFFC857) else MaterialTheme.colorScheme.onSurfaceVariant) }
         }
-        Spacer(Modifier.height(14.dp))
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = RoundedCornerShape(14.dp),
-            placeholder = { Text(if (en) "Search a tool…" else "Pesquisar uma ferramenta…", color = MaxMuted, fontSize = 12.sp) },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = MaxMuted) },
-            trailingIcon = {
-                if (query.isNotBlank()) {
-                    IconButton(onClick = { query = "" }) {
-                        Icon(Icons.Default.Close, null, tint = MaxMuted)
-                    }
-                }
-            },
-            colors = darkFieldColors()
-        )
-        Spacer(Modifier.height(13.dp))
-        Text(
-            if (en) "BROWSE BY CATEGORY" else "EXPLORAR POR CATEGORIA",
-            color = MaxMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+    }
+}
+
+@Composable
+private fun PdfPagePreview(file: File, pageIndex: Int, modifier: Modifier = Modifier) {
+    val image by produceState<ImageBitmap?>(null, file.absolutePath, pageIndex) {
+        value = withContext(Dispatchers.IO) { renderPdfPage(file, pageIndex, 680) }
+    }
+    if (image == null) {
+        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+    } else {
+        Image(image!!, contentDescription = file.name, modifier = modifier, contentScale = ContentScale.Fit)
+    }
+}
+
+private fun renderPdfPage(file: File, pageIndex: Int, targetWidth: Int): ImageBitmap? = runCatching {
+    ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+        PdfRenderer(descriptor).use { renderer ->
+            if (pageIndex !in 0 until renderer.pageCount) return@runCatching null
+            renderer.openPage(pageIndex).use { page ->
+                val targetHeight = (targetWidth.toFloat() * page.height / page.width).roundToInt().coerceAtLeast(120)
+                Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888).also { bitmap ->
+                    bitmap.eraseColor(android.graphics.Color.WHITE)
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                }.asImageBitmap()
+            }
+        }
+    }
+}.getOrNull()
+
+@Composable
+private fun CreateScreen(
+    english: Boolean,
+    images: List<Uri>,
+    onGallery: () -> Unit,
+    onCamera: () -> Unit,
+    onScan: () -> Unit,
+    onCreate: () -> Unit,
+    onRemove: (Int) -> Unit
+) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp)) {
+        ScreenHeader(if (english) "Create PDF from Photo" else "Criar PDF a partir de fotografia", english, onBack = null)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(15.dp)
         ) {
-            categories.forEach { category ->
-                val count = if (category == "All") tools.size else tools.count { toolCategory(it.title) == category }
-                FilterChip(
-                    selected = selectedCategory == category,
-                    onClick = { selectedCategory = category },
-                    label = {
-                        Text("${categoryLabels[category]}  $count", fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFF164A75),
-                        selectedLabelColor = Color.White,
-                        containerColor = Color(0xFF10213A),
-                        labelColor = MaxMuted
+            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF36C98F))
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(if (english) "Document ready" else "Documento preparado", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (images.isEmpty()) (if (english) "Choose photos or capture a page" else "Escolhe fotografias ou captura uma página")
+                        else if (english) images.size.toString() + " page(s) selected" else images.size.toString() + " página(s) selecionada(s)",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
                     )
-                )
+                }
+                if (images.isNotEmpty()) TextButton(onClick = { onRemove(-1) }) { Text(if (english) "Clear" else "Limpar") }
             }
         }
-        Spacer(Modifier.height(14.dp))
-        SectionTitle(
-            if (en) categoryLabels[selectedCategory].orEmpty() else "Ferramentas",
-            visibleTools.size.toString()
-        ) {}
-        if (visibleTools.isEmpty()) {
-            InfoPanel(
-                if (en) "No tools found" else "Nenhuma ferramenta encontrada",
-                if (en) "Try a different word or search by what you want to do." else "Experimente outra palavra ou pesquise pela tarefa que pretende realizar.",
-                Icons.Default.Search
+        Spacer(Modifier.height(15.dp))
+        Box(
+            Modifier.fillMaxWidth().height(230.dp).clip(RoundedCornerShape(22.dp)).background(Color(0xFF061126)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (images.isEmpty()) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.DocumentScanner, null, tint = Color(0xFF19C8FF), modifier = Modifier.size(60.dp))
+                    Text(if (english) "Camera preview" else "Pré-visualização da câmara", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(if (english) "Captured pages will appear here" else "As páginas capturadas aparecerão aqui", color = Color(0xFFA5B6D3), fontSize = 11.sp)
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Collections, null, tint = Color(0xFF19C8FF), modifier = Modifier.size(42.dp))
+                    Text(if (english) "Ready to create " + images.size + " page(s)" else "Pronto para criar " + images.size + " página(s)", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(if (english) "Images are kept on this device" else "As imagens permanecem neste dispositivo", color = Color(0xFFA5B6D3), fontSize = 11.sp)
+                }
+            }
+        }
+        Spacer(Modifier.height(13.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CaptureAction(Icons.Default.PhotoLibrary, if (english) "Gallery" else "Galeria", Modifier.weight(1f), onGallery)
+            CaptureAction(Icons.Default.CameraAlt, if (english) "Camera" else "Câmara", Modifier.weight(1f), onCamera)
+            CaptureAction(Icons.Default.DocumentScanner, if (english) "Scan" else "Digitalizar", Modifier.weight(1f), onScan)
+        }
+        if (images.isNotEmpty()) {
+            Spacer(Modifier.height(17.dp))
+            Text(if (english) "PAGE ORDER" else "ORDEM DAS PÁGINAS", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            images.forEachIndexed { index, _ ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Image, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(10.dp))
+                    Text((if (english) "Page " else "Página ") + (index + 1), Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                    IconButton(onClick = { onRemove(index) }) { Icon(Icons.Default.Close, if (english) "Remove page" else "Remover página") }
+                }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        Button(onClick = onCreate, enabled = images.isNotEmpty(), modifier = Modifier.fillMaxWidth().height(59.dp), shape = RoundedCornerShape(17.dp)) {
+            Text(if (english) "Create PDF" else "Criar PDF", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(if (english) "The original photos are not modified." else "As fotografias originais não são modificadas.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(10.dp))
+        Spacer(Modifier.height(18.dp))
+    }
+}
+
+@Composable
+private fun CaptureAction(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, modifier: Modifier, onClick: () -> Unit) {
+    Card(onClick = onClick, modifier = modifier.height(83.dp), shape = RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(25.dp))
+            Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun SelectPdfScreen(
+    english: Boolean,
+    title: String,
+    subtitle: String,
+    files: List<PdfDocumentItem>,
+    onSelect: (File) -> Unit,
+    onImport: () -> Unit
+) {
+    Column(Modifier.fillMaxSize()) {
+        ScreenHeader(title, english, onBack = null, action = onImport)
+        Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 17.dp))
+        if (files.isEmpty()) {
+            EmptyState(
+                if (english) "No PDFs in your library" else "Não existem PDFs na biblioteca",
+                if (english) "Import a PDF to get started." else "Importa um PDF para começar.",
+                if (english) "Import PDF" else "Importar PDF",
+                onImport
             )
         } else {
-            ToolGrid(visibleTools, choose, en)
+            LazyColumn(contentPadding = PaddingValues(14.dp)) {
+                items(files, key = { it.file.absolutePath }) { item ->
+                    Card(
+                        onClick = { onSelect(item.file) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                        shape = RoundedCornerShape(15.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(51.dp, 65.dp).clip(RoundedCornerShape(7.dp)).background(Color.White), contentAlignment = Alignment.Center) {
+                                PdfPagePreview(item.file, 0, Modifier.fillMaxSize().padding(4.dp))
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(item.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(item.formattedSize + " · " + item.formattedDate, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                            }
+                            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
         }
-        Spacer(Modifier.height(18.dp))
-        InfoPanel(
-            if (en) "A dedicated workspace for every tool" else "Um espaço próprio para cada ferramenta",
-            if (en) "Select your files, watch the processing and review the result before saving." else "Selecione os ficheiros, acompanhe o processamento e reveja o resultado antes de guardar.",
-            Icons.Default.AutoAwesome
-        )
     }
 }
 
 @Composable
-private fun ReaderPage(
-    en: Boolean,
-    fileName: String,
-    uri: Uri?,
-    file: File?,
-    openPdf: () -> Unit,
-    edit: () -> Unit,
-    choose: (ToolSpec) -> Unit
+private fun MergeScreen(
+    english: Boolean,
+    files: List<PdfDocumentItem>,
+    selected: List<String>,
+    onToggle: (String) -> Unit,
+    onMove: (String, Int) -> Unit,
+    onImport: () -> Unit,
+    onMerge: () -> Unit,
+    onBack: () -> Unit
+) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        ScreenHeader(if (english) "Merge PDF" else "Juntar PDFs", english, onBack = onBack, action = onImport)
+        Text(
+            if (english) selected.size.toString() + " files selected · choose at least two" else selected.size.toString() + " ficheiro(s) · escolhe pelo menos dois",
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+        Text(if (english) "Tap a file to add it. Reorder the selected files before merging." else "Toca num ficheiro para o adicionar. Reorganiza os selecionados antes de juntar.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp))
+        if (selected.isNotEmpty()) {
+            LazyColumn(Modifier.heightIn(max = 230.dp), contentPadding = PaddingValues(vertical = 6.dp)) {
+                items(selected, key = { it }) { path ->
+                    val item = files.firstOrNull { it.file.absolutePath == path }
+                    if (item != null) {
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.PictureAsPdf, null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(9.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(item.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(item.formattedSize, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                IconButton(onClick = { onMove(path, -1) }) { Icon(Icons.Default.KeyboardArrowUp, null) }
+                                IconButton(onClick = { onMove(path, 1) }) { Icon(Icons.Default.KeyboardArrowDown, null) }
+                                IconButton(onClick = { onToggle(path) }) { Icon(Icons.Default.Close, null) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Text(if (english) "AVAILABLE DOCUMENTS" else "DOCUMENTOS DISPONÍVEIS", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.padding(top = 9.dp))
+        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(vertical = 6.dp)) {
+            items(files, key = { it.file.absolutePath }) { item ->
+                val checked = selected.contains(item.file.absolutePath)
+                Row(
+                    Modifier.fillMaxWidth().clickable { onToggle(item.file.absolutePath) }.padding(vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(checked, { onToggle(item.file.absolutePath) })
+                    Icon(Icons.Default.PictureAsPdf, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(9.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(item.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(item.formattedSize, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+            }
+        }
+        OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(7.dp)); Text(if (english) "Add more files" else "Adicionar mais ficheiros") }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = onMerge, enabled = selected.size >= 2, modifier = Modifier.fillMaxWidth().height(57.dp), shape = RoundedCornerShape(16.dp)) {
+            Text(if (english) "Merge now" else "Juntar agora", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(if (english) "Files are combined locally. Originals remain untouched." else "Os ficheiros são unidos localmente. Os originais permanecem intactos.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(8.dp))
+    }
+}
+
+@Composable
+private fun ReaderScreen(
+    english: Boolean,
+    file: File,
+    favorite: Boolean,
+    onBack: () -> Unit,
+    onShare: () -> Unit,
+    onFavorite: () -> Unit,
+    onTools: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var pageNumber by remember(uri) { mutableIntStateOf(1) }
-    var pageCount by remember(uri) { mutableIntStateOf(1) }
-    var zoom by remember(uri) { mutableFloatStateOf(1f) }
-    var nightMode by remember(uri) { mutableStateOf(false) }
-    var showSearch by remember(uri) { mutableStateOf(false) }
-    var searchQuery by remember(uri) { mutableStateOf("") }
-    var searchReport by remember(uri) { mutableStateOf("") }
-    var searching by remember(uri) { mutableStateOf(false) }
-    var showProperties by remember(uri) { mutableStateOf(false) }
-    var propertiesText by remember(uri) { mutableStateOf("") }
-    var showMore by remember { mutableStateOf(false) }
-
-    val bookmarkKey = "bookmarks:" + (file?.absolutePath ?: uri?.toString() ?: fileName)
-    val readerPrefs = remember(context) { context.getSharedPreferences("pdfmax_reader", android.content.Context.MODE_PRIVATE) }
-    var bookmarks by remember(bookmarkKey) {
-        mutableStateOf(readerPrefs.getStringSet(bookmarkKey, emptySet()).orEmpty().toSet())
+    val pageCount by produceState<Int?>(null, file.absolutePath) {
+        value = withContext(Dispatchers.IO) { runCatching { PdfEngine.pageCount(context, file) }.getOrNull() }
     }
-    val currentPageKey = pageNumber.toString()
-    val isBookmarked = currentPageKey in bookmarks
-
-    fun toggleBookmark() {
-        val next = if (isBookmarked) bookmarks - currentPageKey else bookmarks + currentPageKey
-        bookmarks = next
-        readerPrefs.edit().putStringSet(bookmarkKey, next.toMutableSet()).apply()
-    }
-
-    fun showActionError(message: String) {
-        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
-    }
-
-    fun shareCurrent() {
-        val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
-        if (source == null || !source.isFile) {
-            showActionError(if (en) "This document cannot be shared from this reader session." else "Não foi possível partilhar este documento nesta sessão.")
-            return
-        }
-        runCatching { DocumentActions.share(context, source) }
-            .onFailure { showActionError(it.message ?: "Falha ao partilhar.") }
-    }
-
-    fun printCurrent() {
-        val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
-        if (source == null || !source.isFile) {
-            showActionError(if (en) "This document cannot be printed from this reader session." else "Não foi possível imprimir este documento nesta sessão.")
-            return
-        }
-        runCatching { DocumentActions.print(context, source) }
-            .onFailure { showActionError(it.message ?: "Falha ao imprimir.") }
-    }
-
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 15.dp, vertical = 7.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = openPdf) {
-                Icon(Icons.Default.ArrowBack, if (en) "Back to files" else "Voltar aos ficheiros", tint = Color.White)
-            }
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null) }
             Column(Modifier.weight(1f)) {
-                Text(fileName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    if (en) "$pageNumber of $pageCount pages" else "$pageNumber de $pageCount páginas",
-                    color = MaxMuted, fontSize = 10.sp
-                )
+                Text(file.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(if (english) (pageCount?.toString() ?: "…") + " pages" else (pageCount?.toString() ?: "…") + " páginas", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
             }
-            IconButton(onClick = { toggleBookmark() }) {
-                Icon(
-                    if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                    if (en) "Bookmark page" else "Marcar página",
-                    tint = if (isBookmarked) MaxCyan else MaxMuted
-                )
+            IconButton(onClick = onFavorite) { Icon(if (favorite) Icons.Default.Star else Icons.Default.StarBorder, null, tint = if (favorite) Color(0xFFFFC857) else MaterialTheme.colorScheme.onSurfaceVariant) }
+            IconButton(onClick = onShare) { Icon(Icons.Default.Share, null) }
+            IconButton(onClick = onTools) { Icon(Icons.Default.Build, if (english) "Edit tools" else "Ferramentas de edição") }
+        }
+        if (pageCount == null) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        } else if (pageCount == 0) {
+            EmptyState(if (english) "No pages found" else "Nenhuma página encontrada", if (english) "This document could not be rendered." else "Não foi possível apresentar este documento.", if (english) "Back" else "Voltar", onBack)
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant),
+                contentPadding = PaddingValues(horizontal = 13.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
+                items(pageCount ?: 0) { index ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                            PdfPagePreview(file, index, Modifier.fillMaxWidth().heightIn(min = 320.dp, max = 690.dp).padding(8.dp))
+                        }
+                        Text((if (english) "Page " else "Página ") + (index + 1) + " / " + pageCount, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp))
+                    }
+                }
             }
-            Box {
-                IconButton(onClick = { showMore = true }) { Icon(Icons.Default.MoreVert, null, tint = MaxText) }
-                DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
-                    DropdownMenuItem(
-                        text = { Text(if (en) "Open another PDF" else "Abrir outro PDF") },
-                        leadingIcon = { Icon(Icons.Default.FolderOpen, null) },
-                        onClick = { showMore = false; openPdf() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(if (en) "Share PDF" else "Partilhar PDF") },
-                        leadingIcon = { Icon(Icons.Default.Share, null) },
-                        onClick = { showMore = false; shareCurrent() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(if (en) "Print PDF" else "Imprimir PDF") },
-                        leadingIcon = { Icon(Icons.Default.Print, null) },
-                        onClick = { showMore = false; printCurrent() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(if (en) "Document properties" else "Propriedades do documento") },
-                        leadingIcon = { Icon(Icons.Default.Info, null) },
-                        onClick = {
-                            showMore = false
-                            scope.launch {
-                                val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
-                                propertiesText = if (source != null && source.isFile) {
-                                    runCatching { withContext(Dispatchers.IO) { PdfOperations.getProperties(context, source) } }
-                                        .getOrElse { it.message ?: "Não foi possível ler as propriedades." }
-                                } else if (en) "Properties are unavailable for this document source." else "As propriedades não estão disponíveis para esta origem."
-                                showProperties = true
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Button(onClick = onTools, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(14.dp)) {
+                    Icon(Icons.Default.Build, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (english) "Open PDF tools" else "Abrir ferramentas PDF")
+                }
+                Text(if (english) "Use the dedicated tools for page rotation, text overlays, watermarks, numbering and security." else "Usa as ferramentas próprias para rodar páginas, adicionar texto, marcas de água, numeração e proteção.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 7.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReaderTool(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, null)
+            Text(label, fontSize = 9.sp)
+        }
+    }
+}
+
+@Composable
+private fun TrashScreen(
+    english: Boolean,
+    items: List<PdfDocumentItem>,
+    onBack: () -> Unit,
+    onRestore: (File) -> Unit,
+    onDelete: (File) -> Unit
+) {
+    Column(Modifier.fillMaxSize()) {
+        ScreenHeader(if (english) "Trash" else "Lixo", english, onBack = onBack)
+        if (items.isEmpty()) {
+            EmptyState(if (english) "Trash is empty" else "O lixo está vazio", if (english) "Deleted PDFs will appear here." else "Os PDFs removidos aparecerão aqui.", if (english) "Back" else "Voltar", onBack)
+        } else {
+            LazyColumn(contentPadding = PaddingValues(14.dp)) {
+                items(items, key = { it.file.absolutePath }) { item ->
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp), shape = RoundedCornerShape(14.dp)) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(item.name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(item.formattedSize, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = { onRestore(item.file) }) { Icon(Icons.Default.Restore, null); Text(if (english) "Restore" else "Restaurar") }
+                                TextButton(onClick = { onDelete(item.file) }) { Icon(Icons.Default.DeleteForever, null); Text(if (english) "Delete forever" else "Eliminar") }
                             }
                         }
-                    )
+                    }
                 }
             }
         }
+    }
+}
 
-        PdfPagePreview(
-            uri = uri,
-            modifier = Modifier.padding(top = 3.dp),
-            pageIndex = pageNumber - 1,
-            zoom = zoom,
-            nightMode = nightMode,
-            onPageCount = { count ->
-                pageCount = count.coerceAtLeast(1)
-                pageNumber = pageNumber.coerceIn(1, pageCount)
-            }
-        )
-        Spacer(Modifier.height(9.dp))
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Color(0xFF112441))
-                .border(1.dp, Color(0xFF294D78), RoundedCornerShape(13.dp)).padding(horizontal = 5.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            IconButton(onClick = { pageNumber = (pageNumber - 1).coerceAtLeast(1) }, enabled = pageNumber > 1) {
-                Icon(Icons.Default.ChevronLeft, null, tint = if (pageNumber > 1) MaxCyan else MaxMuted)
-            }
-            Text(if (en) "Page $pageNumber / $pageCount" else "Página $pageNumber / $pageCount", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-            IconButton(onClick = { pageNumber = (pageNumber + 1).coerceAtMost(pageCount) }, enabled = pageNumber < pageCount) {
-                Icon(Icons.Default.ChevronRight, null, tint = if (pageNumber < pageCount) MaxCyan else MaxMuted)
+@Composable
+private fun ProcessingScreen(english: Boolean, title: String, detail: String, gearAngle: Float) {
+    Box(Modifier.fillMaxSize().padding(22.dp), contentAlignment = Alignment.Center) {
+        Card(shape = RoundedCornerShape(25.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Column(Modifier.fillMaxWidth().padding(26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.Settings, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(72.dp).rotate(gearAngle))
+                Spacer(Modifier.height(18.dp))
+                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(11.dp))
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(13.dp))
+                Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, fontSize = 12.sp)
+                Text(if (english) "Processing locally. Keep PDF Max open." else "Processamento local. Mantém o PDF Max aberto.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 15.dp))
             }
         }
-        Spacer(Modifier.height(10.dp))
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(Color(0xFF112441))
-                .border(1.dp, Color(0xFF294D78), RoundedCornerShape(15.dp)).padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            ReaderAction(Icons.Default.ZoomIn, "${(zoom * 100).toInt()}%", en) {
-                zoom = when {
-                    zoom < 1.2f -> 1.25f
-                    zoom < 1.45f -> 1.5f
-                    zoom < 1.8f -> 2f
-                    else -> 1f
+    }
+}
+
+@Composable
+private fun ResultScreen(
+    english: Boolean,
+    result: ResultFile,
+    onShare: () -> Unit,
+    onWhatsapp: () -> Unit,
+    onOpen: (() -> Unit)?,
+    onDone: () -> Unit
+) {
+    val after = result.file.length()
+    val saved = (result.beforeBytes ?: after) - after
+    val percent = if (result.beforeBytes != null && result.beforeBytes > 0L) ((saved.toDouble() / result.beforeBytes) * 100).roundToInt() else 0
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.height(28.dp))
+        Box(Modifier.size(78.dp).background(Brush.linearGradient(listOf(Color(0xFF13C8DF), Color(0xFF2678E9))), RoundedCornerShape(25.dp)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(46.dp))
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(result.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(result.file.name, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, fontSize = 11.sp)
+        Spacer(Modifier.height(22.dp))
+        if (result.beforeBytes != null) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(19.dp)) {
+                Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text(if (english) "Before" else "Antes", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(formatBytes(result.beforeBytes), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                    Icon(Icons.Default.ArrowForward, null, tint = MaterialTheme.colorScheme.primary)
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(if (english) "After" else "Depois", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(formatBytes(after), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
                 }
             }
-            ReaderAction(Icons.Default.Search, if (en) "Search" else "Pesquisar", en) {
-                searchQuery = ""
-                searchReport = ""
-                showSearch = true
-            }
-            ReaderAction(
-                if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                if (isBookmarked) { if (en) "Saved" else "Marcado" } else { if (en) "Bookmark" else "Marcador" },
-                en,
-                ::toggleBookmark
+            Spacer(Modifier.height(10.dp))
+            Text(
+                when {
+                    percent > 0 -> if (english) "Saved " + percent + "%" else "Redução real: " + percent + "%"
+                    saved == 0L -> if (english) "No size change" else "O tamanho não mudou"
+                    else -> if (english) "The output is larger by " + formatBytes(-saved) else "O ficheiro final ficou maior em " + formatBytes(-saved)
+                },
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
             )
-            ReaderAction(
-                Icons.Default.DarkMode,
-                if (nightMode) { if (en) "Day" else "Dia" } else { if (en) "Night" else "Noite" },
-                en
-            ) { nightMode = !nightMode }
-            ReaderAction(Icons.Default.Share, if (en) "Share" else "Partilhar", en, ::shareCurrent)
-            ReaderAction(Icons.Default.Print, if (en) "Print" else "Imprimir", en, ::printCurrent)
+        } else {
+            Text(formatBytes(after), fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
-
-        if (bookmarks.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            SectionTitle(if (en) "Bookmarks" else "Marcadores", bookmarks.size.toString()) {}
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                bookmarks.mapNotNull { it.toIntOrNull() }.sorted().forEach { bookmarkedPage ->
-                    Box(
-                        Modifier.clip(CircleShape)
-                            .background(if (bookmarkedPage == pageNumber) Color(0xFF164A75) else Color(0xFF172A47))
-                            .clickable { pageNumber = bookmarkedPage.coerceIn(1, pageCount) }
-                            .padding(horizontal = 13.dp, vertical = 9.dp)
-                    ) {
-                        Text(
-                            (if (en) "Page " else "Página ") + bookmarkedPage,
-                            color = Color.White, fontSize = 10.sp,
-                            fontWeight = if (bookmarkedPage == pageNumber) FontWeight.Bold else FontWeight.Medium
-                        )
-                    }
-                }
-            }
+        Spacer(Modifier.height(24.dp))
+        Button(
+            onClick = onWhatsapp,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(15.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF20C96B), contentColor = Color.White)
+        ) {
+            Icon(Icons.Default.Share, null)
+            Spacer(Modifier.width(9.dp))
+            Text(if (english) "Share on WhatsApp" else "Partilhar no WhatsApp", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
-
-        Spacer(Modifier.height(12.dp))
-        SectionTitle(if (en) "Pages" else "Páginas", if (en) "Organize" else "Organizar") {
-            choose(tools.first { it.title == "Organizar páginas" })
+        Spacer(Modifier.height(9.dp))
+        OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth().height(51.dp)) { Text(if (english) "More sharing options" else "Mais opções de partilha") }
+        if (onOpen != null) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth().height(51.dp)) { Text(if (english) "Open document" else "Abrir documento") }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            (1..pageCount.coerceAtMost(5)).forEach { n ->
-                Column(
-                    Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
-                        .border(if (pageNumber == n) 2.dp else 1.dp, if (pageNumber == n) MaxBlue else Color(0xFF263C5D), RoundedCornerShape(8.dp))
-                        .background(Color(0xFF172943)).clickable { pageNumber = n }.padding(5.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    PdfPagePreview(
-                        uri = uri,
-                        modifier = Modifier.fillMaxWidth().height(76.dp),
-                        pageIndex = n - 1,
-                        thumbnail = true
-                    )
-                    Text("$n", color = Color.White, fontSize = 10.sp)
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PrimaryAction(if (en) "Edit PDF" else "Editar PDF", Icons.Default.Edit, edit, Modifier.weight(1f))
-            SecondaryAction(if (en) "More tools" else "Mais ferramentas", Icons.Default.GridView, { choose(tools[20]) }, Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(12.dp))
-    }
-
-    if (showSearch) {
-        AlertDialog(
-            onDismissRequest = { showSearch = false },
-            title = { Text(if (en) "Search document text" else "Pesquisar texto no documento", color = Color.White) },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        singleLine = true,
-                        label = { Text(if (en) "Text to find" else "Texto a encontrar") },
-                        colors = darkFieldColors()
-                    )
-                    if (searchReport.isNotBlank()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(searchReport, color = MaxMuted, fontSize = 10.sp, lineHeight = 14.sp)
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = !searching && searchQuery.isNotBlank(),
-                    onClick = {
-                        val source = file ?: uri?.takeIf { it.scheme == "file" }?.path?.let(::File)
-                        if (source == null || !source.isFile) {
-                            searchReport = if (en) "Text search is unavailable for this source." else "A pesquisa de texto não está disponível para esta origem."
-                        } else {
-                            scope.launch {
-                                searching = true
-                                searchReport = if (en) "Searching…" else "A pesquisar…"
-                                searchReport = runCatching {
-                                    val matches = withContext(Dispatchers.IO) {
-                                        PdfOperations.extractText(context, source)
-                                    }.lineSequence().filter { it.contains(searchQuery, ignoreCase = true) }.take(25).toList()
-                                    if (matches.isEmpty()) {
-                                        if (en) "No matching text was found." else "Não foi encontrado texto correspondente."
-                                    } else {
-                                        (if (en) "${matches.size} matching line(s):\n" else "${matches.size} linha(s) encontrada(s):\n") +
-                                            matches.joinToString("\n") { "• " + it.take(180) }
-                                    }
-                                }.getOrElse { it.message ?: (if (en) "Search failed." else "A pesquisa falhou.") }
-                                searching = false
-                            }
-                        }
-                    }
-                ) { Text(if (searching) { if (en) "Searching…" else "A pesquisar…" } else { if (en) "Search" else "Pesquisar" }, color = MaxCyan) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSearch = false }) { Text(if (en) "Close" else "Fechar", color = MaxMuted) }
-            },
-            containerColor = Color(0xFF102541)
-        )
-    }
-
-    if (showProperties) {
-        AlertDialog(
-            onDismissRequest = { showProperties = false },
-            title = { Text(if (en) "Document properties" else "Propriedades do documento", color = Color.White) },
-            text = { Text(propertiesText, color = MaxMuted, fontSize = 11.sp, lineHeight = 16.sp) },
-            confirmButton = { TextButton(onClick = { showProperties = false }) { Text(if (en) "Close" else "Fechar", color = MaxCyan) } },
-            containerColor = Color(0xFF102541)
-        )
+        TextButton(onClick = onDone) { Text(if (english) "Done" else "Concluído") }
+        Text(if (english) "The original file remains unchanged." else "O ficheiro original permanece intacto.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, modifier = Modifier.padding(top = 12.dp))
     }
 }
 
 @Composable
-private fun ReaderAction(icon: ImageVector, label: String, english: Boolean, click: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.widthIn(min = 43.dp).clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = click).padding(horizontal = 3.dp, vertical = 4.dp)
-    ) {
-        Icon(icon, null, tint = Color(0xFFE4EEFF), modifier = Modifier.size(19.dp))
-        Spacer(Modifier.height(4.dp))
-        Text(label, color = Color(0xFFD6E2F7), fontSize = 9.sp, maxLines = 1)
-    }
-}
-
-@Composable
-private fun EditorPage(en: Boolean, uri: Uri?, openPdf: () -> Unit, choose: (ToolSpec) -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(15.dp)) {
+private fun SettingsScreen(
+    english: Boolean,
+    dark: Boolean,
+    storage: Long,
+    onLanguage: () -> Unit,
+    onTheme: () -> Unit
+) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
+        ScreenHeader(if (english) "Settings" else "Configurações", english)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(if (en) "Edit PDF" else "Editar PDF", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-        }
-        PdfPagePreview(uri)
-        Spacer(Modifier.height(10.dp))
-        Text(if (en) "EDITING TOOLS" else "FERRAMENTAS DE EDIÇÃO", color = MaxMuted, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-        Spacer(Modifier.height(8.dp))
-        ToolGrid(
-            listOf("Adicionar texto", "Editar PDF", "Assinar PDF", "Marca de água", "Preencher formulários", "Rodar páginas")
-                .map { title -> tools.first { it.title == title } },
-            choose, en
-        )
-        Spacer(Modifier.height(12.dp))
-        InfoPanel(if (en) "Precise PDF editing" else "Edição precisa de PDF", if (en) "Choose a tool, select an element and apply your changes." else "Escolha uma ferramenta, selecione um elemento e aplique as alterações.", Icons.Default.Tune)
-        Spacer(Modifier.height(12.dp))
-        PrimaryAction(if (en) "Choose document" else "Escolher documento", Icons.Default.FolderOpen, openPdf)
-    }
-}
-
-@Composable
-private fun ConverterPage(en: Boolean, fileName: String, openPdf: () -> Unit) {
-    var selected by remember { mutableStateOf("Word (.docx)") }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
-        PageTitle(if (en) "PDF Converter" else "Converter PDF", if (en) "Convert documents to the format you need" else "Converta documentos para vários formatos")
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(Color(0xFF102541)).border(1.dp, Color(0xFF294D78), RoundedCornerShape(15.dp)).clickable { openPdf() }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.PictureAsPdf, null, tint = Color(0xFFFF557E), modifier = Modifier.size(34.dp))
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(fileName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                Text(if (en) "Tap to select another file" else "Toque para escolher outro ficheiro", color = MaxMuted, fontSize = 10.sp)
-            }
-            Icon(Icons.Default.Add, null, tint = MaxCyan)
-        }
-        Spacer(Modifier.height(18.dp))
-        Text(if (en) "CONVERT TO" else "CONVERTER PARA", color = MaxMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(10.dp))
-        listOf(
-            Triple("Word (.docx)", Icons.Default.Description, Color(0xFF3189F5)),
-            Triple("Excel (.xlsx)", Icons.Default.TableChart, Color(0xFF13B887)),
-            Triple("PowerPoint (.pptx)", Icons.Default.Slideshow, Color(0xFFFF8050)),
-            Triple(if (en) "Image (JPG / PNG)" else "Imagem (JPG / PNG)", Icons.Default.Image, Color(0xFFD64AB6)),
-            Triple(if (en) "PDF (optimized)" else "PDF (otimizado)", Icons.Default.PictureAsPdf, Color(0xFF8D68F8))
-        ).forEach { option ->
-            val active = selected == option.first
-            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(13.dp)).background(if (active) Color(0xFF15385D) else Color(0xFF0E203B)).border(1.dp, if (active) MaxBlue else Color(0xFF203754), RoundedCornerShape(13.dp)).clickable { selected = option.first }.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(37.dp).clip(RoundedCornerShape(10.dp)).background(option.third.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) { Icon(option.second, null, tint = option.third) }
-                Spacer(Modifier.width(12.dp))
-                Text(option.first, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                RadioButton(active, { selected = option.first }, colors = RadioButtonDefaults.colors(selectedColor = MaxCyan))
+            PdfMaxLogo(61)
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text("PDF Max", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(if (english) "PDF Editor & Reader" else "Editor e leitor de PDF", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
-        Spacer(Modifier.height(17.dp))
-        PrimaryAction(if (en) "Convert file" else "Converter ficheiro", Icons.Default.SwapHoriz, {})
-        Spacer(Modifier.height(12.dp))
-        Text(if (en) "Conversion options" else "Opções de conversão", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        Text(if (en) "Output quality • page range • preserve layout" else "Qualidade de saída • intervalo de páginas • manter layout", color = MaxMuted, fontSize = 11.sp)
-    }
-}
-
-@Composable
-private fun ScannerPage(en: Boolean) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
-        PageTitle(if (en) "Scan & OCR" else "Digitalizar e OCR", if (en) "Turn paper documents into searchable PDFs" else "Transforme documentos físicos em PDFs pesquisáveis")
-        Box(Modifier.fillMaxWidth().height(270.dp).clip(RoundedCornerShape(22.dp)).background(Brush.linearGradient(listOf(Color(0xFF173556), Color(0xFF0B1A31)))).border(1.dp, Color(0xFF2B5B8E), RoundedCornerShape(22.dp)), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(94.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFF168BFF).copy(alpha = 0.19f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.DocumentScanner, null, tint = MaxCyan, modifier = Modifier.size(55.dp)) }
-                Spacer(Modifier.height(15.dp))
-                Text(if (en) "Ready to scan" else "Pronto para digitalizar", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text(if (en) "Place a document inside the frame" else "Coloque o documento dentro da moldura", color = MaxMuted, fontSize = 11.sp)
-                Spacer(Modifier.height(15.dp))
-                Box(Modifier.width(190.dp).height(2.dp).background(MaxCyan))
+        SettingSection(if (english) "GENERAL" else "GERAL")
+        SettingRow(Icons.Default.Language, if (english) "Language" else "Idioma", if (english) "English" else "Português", onLanguage)
+        SettingRow(Icons.Default.DarkMode, if (english) "Theme" else "Tema", if (dark) (if (english) "Dark" else "Escuro") else (if (english) "Light" else "Claro"), onTheme)
+        SettingSection(if (english) "STORAGE" else "ARMAZENAMENTO")
+        SettingRow(Icons.Default.Storage, if (english) "PDF Max files" else "Ficheiros PDF Max", formatBytes(storage), {})
+        SettingSection(if (english) "PRIVACY & SUPPORT" else "PRIVACIDADE E SUPORTE")
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(15.dp)) {
+            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
+                Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    if (english) "Documents are processed on this device. PDF Max opens files only when you choose them and shares them only when you request it."
+                    else "Os documentos são processados neste dispositivo. O PDF Max abre ficheiros quando os escolhes e só os partilha quando solicitas.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
             }
         }
         Spacer(Modifier.height(16.dp))
-        Text(if (en) "SCAN MODE" else "MODO DE DIGITALIZAÇÃO", color = MaxMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(9.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(if (en) "Document" else "Documento", if (en) "Book" else "Livro", if (en) "Card" else "Cartão", if (en) "Photo" else "Foto").forEachIndexed { index, label ->
-                Box(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(if (index == 0) Color(0xFF075FC0) else Color(0xFF152945)).padding(vertical = 11.dp), contentAlignment = Alignment.Center) { Text(label, color = Color.White, fontSize = 10.sp) }
-            }
+        Text("PDF Max · 2.0", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterHorizontally), fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun SettingSection(title: String) {
+    Text(title, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.padding(top = 24.dp, bottom = 7.dp))
+}
+
+@Composable
+private fun SettingRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, value: String, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(14.dp))
+        Text(title, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+        Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+}
+
+@Composable
+private fun QuickAction(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, onClick: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(title, fontWeight = FontWeight.SemiBold) },
+        leadingContent = { Icon(icon, null, tint = MaterialTheme.colorScheme.primary) },
+        trailingContent = { Icon(Icons.Default.ChevronRight, null) },
+        modifier = Modifier.clickable(onClick = onClick)
+    )
+}
+
+@Composable
+private fun EmptyCard(title: String, detail: String, action: String, onClick: () -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.FolderOpen, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(42.dp))
+            Spacer(Modifier.height(9.dp))
+            Text(title, fontWeight = FontWeight.Bold)
+            Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(11.dp))
+            Button(onClick = onClick) { Text(action) }
         }
-        Spacer(Modifier.height(17.dp))
-        PrimaryAction(if (en) "Start scan" else "Iniciar digitalização", Icons.Default.CameraAlt, {})
+    }
+}
+
+@Composable
+private fun EmptyState(title: String, detail: String, action: String, onAction: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(Icons.Default.Description, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(52.dp))
         Spacer(Modifier.height(10.dp))
-        SecondaryAction(if (en) "Import an image" else "Importar uma imagem", Icons.Default.Image, {})
-        Spacer(Modifier.height(15.dp))
-        InfoPanel("OCR", if (en) "Recognize text and make scanned pages searchable." else "Reconheça o texto e torne as páginas digitalizadas pesquisáveis.", Icons.Default.TextFields)
-    }
-}
-
-@Composable
-private fun ProtectPage(en: Boolean) {
-    var password by remember { mutableStateOf("") }
-    var confirm by remember { mutableStateOf("") }
-    var mode by remember { mutableStateOf(0) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
-        PageTitle(if (en) "Protect PDF" else "Proteger PDF", if (en) "Control access to your documents" else "Controle o acesso aos seus documentos")
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFF112541)).padding(4.dp)) {
-            listOf(if (en) "Password" else "Senha", if (en) "Permissions" else "Permissões", if (en) "Signature" else "Assinatura").forEachIndexed { i, label ->
-                Box(Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(if (mode == i) Color(0xFF0875D9) else Color.Transparent).clickable { mode = i }.padding(vertical = 10.dp), contentAlignment = Alignment.Center) { Text(label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
-            }
-        }
-        Spacer(Modifier.height(26.dp))
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(100.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Color(0xFF177DFF).copy(alpha = 0.5f), Color(0xFF122F62)))), contentAlignment = Alignment.Center) { Icon(Icons.Default.Lock, null, tint = Color.White, modifier = Modifier.size(50.dp)) }
-        }
-        Spacer(Modifier.height(18.dp))
-        Text(if (en) "Set a password" else "Definir uma senha", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
-        Text(if (en) "Protect your PDF with a secure password." else "Proteja o seu PDF com uma senha de acesso.", color = MaxMuted, fontSize = 11.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
-        Spacer(Modifier.height(20.dp))
-        OutlinedTextField(password, { password = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (en) "Password" else "Senha") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, colors = darkFieldColors())
-        Spacer(Modifier.height(9.dp))
-        OutlinedTextField(confirm, { confirm = it }, modifier = Modifier.fillMaxWidth(), label = { Text(if (en) "Confirm password" else "Confirmar senha") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, colors = darkFieldColors())
-        Spacer(Modifier.height(13.dp))
-        Text(if (en) "Password strength" else "Força da senha", color = MaxMuted, fontSize = 10.sp)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            repeat(5) { i -> Box(Modifier.weight(1f).height(5.dp).clip(CircleShape).background(if (password.length >= (i + 1) * 2) Color(0xFF18C98A) else Color(0xFF263C58))) }
-        }
-        Spacer(Modifier.height(22.dp))
-        PrimaryAction(if (en) "Protect PDF" else "Proteger PDF", Icons.Default.Security, {})
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, fontSize = 12.sp)
         Spacer(Modifier.height(12.dp))
-        InfoPanel(if (en) "Document protection" else "Proteção do documento", if (en) "Choose a PDF first. Encryption is performed by the document engine." else "Escolha primeiro um PDF. A encriptação será realizada pelo motor de documentos.", Icons.Default.Shield)
+        Button(onClick = onAction) { Text(action) }
     }
 }
 
-@Composable
-private fun SettingsPage(en: Boolean, changeLanguage: () -> Unit) {
-    val context = LocalContext.current
-    val storageSummary = remember(en) {
-        runCatching {
-            val stats = android.os.StatFs(android.os.Environment.getExternalStorageDirectory().absolutePath)
-            val free = android.text.format.Formatter.formatShortFileSize(context, stats.availableBytes)
-            val total = android.text.format.Formatter.formatShortFileSize(context, stats.totalBytes)
-            if (en) "$free free of $total" else "$free livres de $total"
-        }.getOrElse { if (en) "Storage information unavailable" else "Informação de armazenamento indisponível" }
-    }
-
-    fun openAndroidAppSettings() {
-        runCatching {
-            context.startActivity(
-                Intent(
-                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.parse("package:" + context.packageName)
-                )
-            )
-        }
-    }
-
-    fun openSupport() {
-        runCatching {
-            context.startActivity(
-                Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse("https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/issues")
-                )
-            )
-        }
-    }
-
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
-        PageTitle(
-            if (en) "Settings" else "Configurações",
-            if (en) "Manage your PDF Max preferences and device access" else "Gira as preferências do PDF Max e o acesso ao dispositivo"
-        )
-        SettingsGroup(if (en) "PREFERENCES" else "PREFERÊNCIAS")
-        SettingRow(
-            Icons.Default.Palette,
-            if (en) "Appearance" else "Aparência",
-            if (en) "Premium dark interface" else "Interface escura premium"
-        )
-        SettingRow(
-            Icons.Default.Language,
-            if (en) "Language" else "Idioma",
-            if (en) "English / Português" else "Português / English",
-            changeLanguage
-        )
-        SettingRow(
-            Icons.Default.Notifications,
-            if (en) "Notifications" else "Notificações",
-            if (en) "No push notifications are configured in this release." else "Esta versão não configura notificações push."
-        )
-        SettingsGroup(if (en) "STORAGE & PRIVACY" else "ARMAZENAMENTO E PRIVACIDADE")
-        SettingRow(
-            Icons.Default.Storage,
-            if (en) "Device storage" else "Armazenamento do dispositivo",
-            storageSummary
-        )
-        SettingRow(
-            Icons.Default.Security,
-            if (en) "App permissions" else "Permissões da aplicação",
-            if (en) "Review document and camera access in Android settings" else "Reveja o acesso a documentos e à câmara nas definições Android",
-            ::openAndroidAppSettings
-        )
-        SettingRow(
-            Icons.Default.Cloud,
-            if (en) "Cloud sync" else "Sincronização na nuvem",
-            if (en) "Not available in this release" else "Ainda não disponível nesta versão"
-        )
-        SettingsGroup(if (en) "SUPPORT & ABOUT" else "SUPORTE E SOBRE")
-        SettingRow(
-            Icons.Default.Help,
-            if (en) "Help & support" else "Ajuda e suporte",
-            if (en) "Open the PDF Max issue tracker" else "Abrir o suporte do PDF Max no GitHub",
-            ::openSupport
-        )
-        SettingRow(
-            Icons.Default.Info,
-            if (en) "About PDF Max" else "Sobre o PDF Max",
-            "PDF Max 1.2.6 • Android 8.0+"
-        )
-        Spacer(Modifier.height(18.dp))
-        Text(
-            "PDF Max – PDF Editor & Reader",
-            color = MaxMuted, fontSize = 10.sp,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
-    }
-}
-
-@Composable
-private fun ToolDetailPage(tool: ToolSpec, en: Boolean, openPdf: () -> Unit) {
-    var choice by remember { mutableStateOf(0) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(17.dp)) {
-        PageTitle(tool.title, tool.subtitle)
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Brush.linearGradient(listOf(tool.color.copy(alpha = 0.30f), Color(0xFF10213B)))).border(1.dp, tool.color.copy(alpha = 0.55f), RoundedCornerShape(18.dp)).padding(17.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(59.dp).clip(RoundedCornerShape(16.dp)).background(tool.color), contentAlignment = Alignment.Center) { Icon(tool.icon, null, tint = Color.White, modifier = Modifier.size(33.dp)) }
-            Spacer(Modifier.width(13.dp))
-            Column {
-                Text(tool.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text(if (en) "Configure your options" else "Configure as suas opções", color = MaxMuted, fontSize = 11.sp)
-            }
-        }
-        Spacer(Modifier.height(20.dp))
-        SectionTitle(if (en) "1. Select a document" else "1. Selecionar documento", if (en) "Browse" else "Procurar", openPdf)
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Color(0xFF10233F)).border(1.dp, Color(0xFF29466C), RoundedCornerShape(13.dp)).clickable { openPdf() }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.PictureAsPdf, null, tint = Color(0xFFFF5278), modifier = Modifier.size(29.dp))
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(if (en) "Choose PDF file" else "Escolher ficheiro PDF", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                Text(if (en) "Select a file from your device" else "Selecione um ficheiro do dispositivo", color = MaxMuted, fontSize = 10.sp)
-            }
-            Icon(Icons.Default.ChevronRight, null, tint = MaxMuted)
-        }
-        Spacer(Modifier.height(20.dp))
-        SectionTitle(if (en) "2. Options" else "2. Opções", "") {}
-        val options = when (tool.title) {
-            "Comprimir PDF" -> listOf("Máxima qualidade", "Equilibrado", "Tamanho mínimo")
-            "Dividir PDF" -> listOf("Todas as páginas", "Intervalo de páginas", "Páginas selecionadas")
-            "Marca de água" -> listOf("Texto", "Imagem", "Personalizada")
-            "Rodar páginas" -> listOf("90°", "180°", "270°")
-            else -> listOf(if (en) "Recommended" else "Recomendado", if (en) "Advanced options" else "Opções avançadas", if (en) "Custom settings" else "Configuração personalizada")
-        }
-        options.forEachIndexed { i, label ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFF10213A)).clickable { choice = i }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(label, color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                RadioButton(choice == i, { choice = i }, colors = RadioButtonDefaults.colors(selectedColor = MaxCyan))
-            }
-        }
-        Spacer(Modifier.height(18.dp))
-        PrimaryAction(if (en) "Continue" else "Continuar", Icons.Default.ArrowForward, {})
-        Spacer(Modifier.height(12.dp))
-        Text(if (en) "Processing options will be activated as this tool is implemented." else "As opções de processamento serão ativadas à medida que esta ferramenta for implementada.", color = MaxMuted, fontSize = 10.sp)
-    }
-}
-
-@Composable
-private fun SideMenu(current: Page, en: Boolean, navigate: (Page) -> Unit, language: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 15.dp, vertical = 20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                painter = painterResource(R.drawable.ic_pdfmax),
-                contentDescription = "PDF Max",
-                modifier = Modifier.size(43.dp).clip(RoundedCornerShape(13.dp))
-            )
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text("PDF Max", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("PDF Editor & Reader", color = MaxMuted, fontSize = 10.sp)
-            }
-        }
-        Spacer(Modifier.height(23.dp))
-        Text(if (en) "WORKSPACE" else "ESPAÇO DE TRABALHO", color = Color(0xFF7186A5), fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp, bottom = 7.dp))
-        DrawerItem(Icons.Default.Home, if (en) "Home" else "Início", current == Page.HOME) { navigate(Page.HOME) }
-        DrawerItem(Icons.Default.FolderOpen, if (en) "My files" else "Meus Arquivos", current == Page.FILES) { navigate(Page.FILES) }
-        DrawerItem(Icons.Default.GridView, if (en) "Tools" else "Ferramentas", current == Page.TOOLS) { navigate(Page.TOOLS) }
-        DrawerItem(Icons.Default.Star, if (en) "Favorites" else "Favoritos", current == Page.FAVORITES) { navigate(Page.FAVORITES) }
-        DrawerItem(Icons.Default.History, if (en) "Recent" else "Recentes", current == Page.RECENT) { navigate(Page.RECENT) }
-        DrawerItem(Icons.Default.Delete, if (en) "Trash" else "Lixeira", current == Page.TRASH) { navigate(Page.TRASH) }
-        Spacer(Modifier.height(17.dp))
-        Text(if (en) "PREFERENCES" else "PREFERÊNCIAS", color = Color(0xFF7186A5), fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp, bottom = 7.dp))
-        DrawerItem(Icons.Default.Settings, if (en) "Settings" else "Configurações", current == Page.SETTINGS) { navigate(Page.SETTINGS) }
-        DrawerItem(Icons.Default.Help, if (en) "Help & support" else "Ajuda e suporte", false) { navigate(Page.SETTINGS) }
-        DrawerItem(Icons.Default.Info, if (en) "About" else "Sobre", false) { navigate(Page.SETTINGS) }
-        Spacer(Modifier.weight(1f))
-        Divider(color = Color(0xFF20334F))
-        Row(Modifier.fillMaxWidth().clickable { language() }.padding(horizontal = 10.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Language, null, tint = MaxCyan)
-            Spacer(Modifier.width(12.dp))
-            Text(if (en) "English" else "Português", color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
-            Text("PT / EN", color = MaxMuted, fontSize = 10.sp)
-        }
-        Text("PDF Max  •  v1.2.6", color = MaxMuted, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
-    }
-}
-
-@Composable
-private fun DrawerItem(icon: ImageVector, label: String, selected: Boolean, click: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp).clip(RoundedCornerShape(10.dp)).background(if (selected) Color(0xFF123F78) else Color.Transparent).clickable(onClick = click).padding(horizontal = 11.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = if (selected) Color(0xFF58B9FF) else Color(0xFFB1C2DC), modifier = Modifier.size(19.dp))
-        Spacer(Modifier.width(13.dp))
-        Text(label, color = if (selected) Color.White else Color(0xFFD9E4F5), fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
-    }
-}
-
-@Composable
-private fun BottomBar(modifier: Modifier, current: Page, en: Boolean, home: () -> Unit, files: () -> Unit, add: () -> Unit, favoritesClick: () -> Unit, menu: () -> Unit) {
-    Row(modifier.background(Color(0xFF071329)).border(BorderStroke(1.dp, Color(0xFF1C3557))).navigationBarsPadding().height(66.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
-        BottomItem(Modifier.weight(1f), Icons.Default.Home, if (en) "Home" else "Início", current == Page.HOME, home)
-        BottomItem(Modifier.weight(1f), Icons.Default.FolderOpen, if (en) "Files" else "Arquivos", current == Page.FILES, files)
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(48.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF20B7FF), Color(0xFF8E36FF), Color(0xFF275DFF)))).border(1.dp, Color(0xFF67D9FF), CircleShape).clickable(onClick = add), contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(29.dp)) }
-        }
-        BottomItem(Modifier.weight(1f), Icons.Default.Star, if (en) "Favorites" else "Favoritos", current == Page.FAVORITES, favoritesClick)
-        BottomItem(Modifier.weight(1f), Icons.Default.Menu, if (en) "More" else "Mais", false, menu)
-    }
-}
-
-@Composable
-private fun BottomItem(modifier: Modifier, icon: ImageVector, label: String, selected: Boolean, click: () -> Unit) {
-    Column(modifier.fillMaxHeight().clickable(onClick = click), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Icon(icon, null, tint = if (selected) MaxCyan else Color(0xFF8092AE), modifier = Modifier.size(20.dp))
-        Spacer(Modifier.height(3.dp))
-        Text(label, color = if (selected) MaxCyan else Color(0xFF8092AE), fontSize = 9.sp)
-    }
-}
-
-@Composable
-private fun PageTitle(title: String, subtitle: String) {
-    Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-    Spacer(Modifier.height(3.dp))
-    Text(subtitle, color = MaxMuted, fontSize = 11.sp)
-    Spacer(Modifier.height(17.dp))
-}
-
-@Composable
-private fun SearchBar(hint: String, click: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFF172A49)).clickable(onClick = click).padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Search, null, tint = MaxMuted, modifier = Modifier.size(19.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(hint, color = MaxMuted, fontSize = 12.sp)
-    }
-}
-
-@Composable
-private fun PrimaryAction(text: String, icon: ImageVector, click: () -> Unit, modifier: Modifier = Modifier) {
-    Button(onClick = click, modifier = modifier.fillMaxWidth().height(49.dp), shape = RoundedCornerShape(13.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF087FF1)), contentPadding = PaddingValues(horizontal = 14.dp)) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-    }
-}
-
-@Composable
-private fun SecondaryAction(text: String, icon: ImageVector, click: () -> Unit, modifier: Modifier = Modifier) {
-    OutlinedButton(onClick = click, modifier = modifier.fillMaxWidth().height(49.dp), shape = RoundedCornerShape(13.dp), border = BorderStroke(1.dp, Color(0xFF2B5C90)), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
-        Icon(icon, null, modifier = Modifier.size(17.dp))
-        Spacer(Modifier.width(7.dp))
-        Text(text, fontSize = 11.sp)
-    }
-}
-
-@Composable
-private fun InfoPanel(title: String, text: String, icon: ImageVector) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFF112541)).border(1.dp, Color(0xFF294667), RoundedCornerShape(14.dp)).padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = MaxCyan, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.width(11.dp))
-        Column {
-            Text(title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Text(text, color = MaxMuted, fontSize = 10.sp, lineHeight = 14.sp)
-        }
-    }
-}
-
-@Composable
-private fun SettingsGroup(text: String) {
-    Text(text, color = MaxMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 17.dp, bottom = 8.dp))
-}
-
-@Composable
-private fun SettingRow(icon: ImageVector, title: String, detail: String, click: (() -> Unit)? = null) {
-    val rowModifier = if (click != null) {
-        Modifier.clickable { click() }
-    } else {
-        Modifier
-    }
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .then(rowModifier).padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, null, tint = MaxCyan, modifier = Modifier.size(21.dp))
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(detail, color = MaxMuted, fontSize = 10.sp, lineHeight = 14.sp)
-        }
-        if (click != null) Icon(Icons.Default.ChevronRight, null, tint = MaxMuted)
-    }
-    Divider(color = Color(0xFF1C2E49))
-}
-
-@Composable
-private fun darkFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-    focusedBorderColor = MaxBlue, unfocusedBorderColor = Color(0xFF304766),
-    focusedLabelColor = MaxCyan, unfocusedLabelColor = MaxMuted,
-    cursorColor = MaxCyan, focusedContainerColor = Color(0xFF0D1D35),
-    unfocusedContainerColor = Color(0xFF0D1D35)
-)
-
-internal fun localizedToolTitle(title: String, english: Boolean): String {
-    if (!english) return title
-    return when (title) {
-        "Criar PDF" -> "Create PDF"; "Editar PDF" -> "Edit PDF"; "Converter PDF" -> "Convert PDF"
-        "Comprimir PDF" -> "Compress PDF"; "Juntar PDF" -> "Merge PDFs"; "Dividir PDF" -> "Split PDF"
-        "Proteger PDF" -> "Protect PDF"; "Assinar PDF" -> "Sign PDF"; "Digitalizar e OCR" -> "Scan & OCR"
-        "Extrair imagens" -> "Extract images"; "Adicionar texto" -> "Add text"; "Marca de água" -> "Watermark"
-        "Numerar páginas" -> "Page numbers"; "Rodar páginas" -> "Rotate pages"; "Comparar PDFs" -> "Compare PDFs"
-        "Traduzir PDF" -> "Translate PDF"; "Preencher formulários" -> "Fill forms"; "Reparar PDF" -> "Repair PDF"
-        "PDF para imagem" -> "PDF to image"; "Imagem para PDF" -> "Image to PDF"; "Organizar páginas" -> "Organize pages"
-        "Imprimir PDF" -> "Print PDF"; "Partilhar PDF" -> "Share PDF"; "Ver propriedades" -> "File properties"
-        "Remover páginas" -> "Delete pages"; "Extrair texto PDF" -> "Extract PDF text"; "Criar ZIP" -> "Create ZIP"
-        "Detetar duplicados" -> "Find duplicates"; "Extrair páginas" -> "Extract pages"
-        "Adicionar página em branco" -> "Add blank page"; "Editar metadados" -> "Edit metadata"
-        "Achatar formulários" -> "Flatten forms"; "Remover metadados" -> "Remove metadata"
-        "Relatório do PDF" -> "PDF report"
-        else -> title
-    }
-}
-internal fun localizedToolSubtitle(title: String, english: Boolean): String {
-    if (!english) return if (title == "Criar PDF") "Laboratório de escrita e layout" else tools.firstOrNull { it.title == title }?.subtitle.orEmpty()
-    return when (title) {
-        "Criar PDF" -> "Writing and layout workspace"; "Editar PDF" -> "Add text overlays to PDF pages"
-        "Converter PDF" -> "Word, Excel and images"; "Comprimir PDF" -> "Rewrite PDF structure; size may vary"
-        "Juntar PDF" -> "Combine documents"; "Dividir PDF" -> "Split by page range"
-        "Proteger PDF" -> "Password and permissions"; "Assinar PDF" -> "Handwritten visual signature"
-        "Digitalizar e OCR" -> "Scan documents to PDF"; "Extrair imagens" -> "Save embedded images"
-        "Adicionar texto" -> "Insert text"; "Marca de água" -> "Text or image watermark"
-        "Numerar páginas" -> "Headers and footers"; "Rodar páginas" -> "Change page orientation"
-        "Comparar PDFs" -> "Compare document content"; "Traduzir PDF" -> "Translate document text"
-        "Preencher formulários" -> "Fill interactive fields"; "Reparar PDF" -> "Attempt to recover readable PDFs"
-        "PDF para imagem" -> "Export pages as images"; "Imagem para PDF" -> "Combine JPG and PNG files"
-        "Organizar páginas" -> "Reorder document pages"; "Imprimir PDF" -> "Prepare for printing"
-        "Partilhar PDF" -> "Send your document"; "Ver propriedades" -> "Document information"
-        "Remover páginas" -> "Delete selected pages"; "Extrair texto PDF" -> "Save text as TXT"
-        "Criar ZIP" -> "Archive multiple files"; "Detetar duplicados" -> "Find exact copies"
-        "Extrair páginas" -> "Create a PDF from selected pages"; "Adicionar página em branco" -> "Insert a new page"
-        "Editar metadados" -> "Title, author and keywords"
-        "Achatar formulários" -> "Make existing form fields read-only page content"
-        "Remover metadados" -> "Clear standard document info and catalog XMP metadata"
-        "Relatório do PDF" -> "Pages, word count and extractable text"
-        else -> tools.firstOrNull { it.title == title }?.subtitle.orEmpty()
-    }
+private fun formatBytes(value: Long): String = when {
+    value >= 1024L * 1024L -> String.format(Locale.getDefault(), "%.2f MB", value / (1024f * 1024f))
+    value >= 1024L -> String.format(Locale.getDefault(), "%.0f KB", value / 1024f)
+    else -> "$value B"
 }

@@ -1,46 +1,53 @@
 # PDF Max – Privacy Policy
 
-**Version:** 1.2.6 (versionCode 11)  
-**Last updated:** 4 November 2026  
+**Version:** 2.0.0 (versionCode 12)  
+**Last updated:** 6 November 2026  
 **Public policy page:** https://nexauren1.github.io/PDF-Max-PDF-Editor-Reader/privacy-policy.html
 
-The bilingual HTML page has been committed under `docs/privacy-policy.html`. The GitHub Pages address above is the intended public URL; it becomes live after GitHub Pages is enabled for this repository with **GitHub Actions** as the publishing source. Until then, the HTML file can be viewed in the repository at https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/blob/main/docs/privacy-policy.html.
+## English
 
-## Summary
+PDF Max is an Android PDF utility. This version processes documents locally on the device. The developer does not operate a PDF Max account service, cloud document storage, advertising service, analytics service or document-upload server.
 
-PDF Max is an Android document utility. Normal PDF operations, the document index, local preferences, camera capture and ML Kit OCR/translation processing are designed to run on the device. The developer does not operate an account system, cloud document storage, advertising SDK, developer analytics SDK or document-upload service.
+### Files and permissions
 
-## Permissions
+PDF Max does not request Android All files access, broad shared-storage access, camera permission or Internet permission. Users choose PDF documents through Android's document picker and photos through the system photo picker. When the user chooses Camera, Android opens the system camera capture flow. Captured images are returned to PDF Max for the requested operation.
 
-- **All files access** (`MANAGE_EXTERNAL_STORAGE`): used to discover supported documents in shared storage and provide the app's internal library and document tools. This is broad access to shared storage, not access limited to one user-selected file.
-- **Read external storage** (up to Android 12L): used on older Android versions for the document library.
-- **Camera**: requested only when the user starts the in-app document capture feature.
-- **Internet / network state**: used by Google Play services and ML Kit for language-model downloads and related service/diagnostic communication, and when opening external support or information links.
+An imported PDF is copied into the app-private PDF Max workspace. Files created by PDF Max are saved in that private workspace. The app's library displays PDF files imported or created inside PDF Max; it does not scan all folders on the device.
 
-## Information stored locally
+### Information stored on the device
 
-The app stores a local index (file names, paths, extensions, sizes and modification dates), favourites, recently opened paths, in-app Trash entries, reader bookmarks, language preference and temporary operation/share files in private app storage. These are not uploaded to a PDF Max account. The in-app Trash only hides a library item; it does not delete the original file.
+PDF Max stores document files that the user imports or creates, plus local preferences for language, theme, favourites and recently opened files. The in-app Trash stores files moved there by the user until they are restored or permanently deleted. Temporary camera captures are stored in the app cache.
 
-Generated documents are saved in `Documents/PDF Max`; camera scans are saved in `Documents/PDF Max/Scans`. Temporary review copies are kept in the app cache and removed when possible after saving or discarding. Android may clear cache data. Clearing app data or uninstalling removes the private index, preferences and cache, but exported files in shared Documents storage remain until the user deletes them.
+This information is not sent to servers operated by the developer. It remains on the device unless the user explicitly shares a file or removes it. Clearing app data or uninstalling the app removes private workspace files and local preferences.
 
-## Local processing and Google ML Kit
+### Processing and sharing
 
-PDF reading and editing operations run locally. Camera images and OCR are processed on-device. PDF translation uses on-device ML Kit translation models; the current implementation requests language-model downloads over Wi-Fi through Google Play services. The document text used by OCR/translation is processed on the device and is not sent to servers operated by the developer.
+PDF operations run locally using Android and PDFBox libraries. PDF Max does not upload document contents. The app opens Android's share sheet only after the user chooses to share a result. The receiving application then handles the shared file under its own privacy policy.
 
-Google's ML Kit Android SDKs collect technical diagnostics and usage metrics. Google's disclosure says these can include device manufacturer/model and Android version/build, app package/version, device or per-installation identifiers, performance/latency metrics, API configuration, input/output size, feature version, event types and error codes. The Translate feature may also collect configured source/target languages and use Firebase remote-configuration/installation diagnostics. Google states that the listed data is encrypted in transit using HTTPS and is not transferred by Google to third parties. See [Google ML Kit Android data disclosure](https://developers.google.com/ml-kit/android-data-disclosure), [ML Kit terms](https://developers.google.com/ml-kit/terms) and [Google Privacy Policy](https://policies.google.com/privacy).
+### Children's privacy and changes
 
-## Sharing and printing
+PDF Max does not knowingly collect personal information from children or adults. This policy may be updated when app functionality changes. The current version and update date are shown at the top of this document.
 
-Sharing and printing start only after the user chooses the action. Android's share sheet or print service then handles the file and the selected recipient, app or printer under that service's own privacy policy.
+## Português
 
-## Developer collection and contact
+O PDF Max é uma ferramenta Android para documentos PDF. Nesta versão, os documentos são processados localmente no dispositivo. O programador não opera um serviço de contas PDF Max, armazenamento de documentos na nuvem, serviço de publicidade, serviço de análise de utilização ou servidor para envio de documentos.
 
-The current app build does not include a developer-operated account system, ads SDK, developer analytics SDK or document-upload service. The developer does not receive documents, the file index, favourites, recents, in-app Trash entries, bookmarks or language preference through the app. The app does not request location, contacts, microphone or SMS permissions. These statements do not exclude the ML Kit technical diagnostics described above.
+### Ficheiros e permissões
 
-For privacy questions, use the [PDF Max GitHub support page](https://github.com/nexauren1/PDF-Max-PDF-Editor-Reader/issues). GitHub issues may be public; do not post private documents, passwords or other sensitive information in a public issue.
+O PDF Max não solicita acesso a todos os ficheiros, acesso amplo ao armazenamento partilhado, permissão de câmara ou permissão de Internet. O utilizador escolhe documentos PDF através do seletor de documentos do Android e fotografias através do seletor de fotografias do sistema. Quando o utilizador escolhe Câmara, o Android abre o fluxo de captura da aplicação de câmara do sistema. As fotografias capturadas são devolvidas ao PDF Max para a operação solicitada.
 
-**Developer:** Nexauren · PDF Max
+Um PDF importado é copiado para a área privada do PDF Max. Os ficheiros criados pelo PDF Max são guardados nessa área privada. A biblioteca da aplicação apresenta os PDFs importados ou criados dentro do PDF Max; não pesquisa todas as pastas do dispositivo.
 
----
+### Informação guardada no dispositivo
 
-The HTML page contains the complete policy in Portuguese and English.
+O PDF Max guarda os documentos que o utilizador importa ou cria, bem como preferências locais de idioma, tema, favoritos e ficheiros abertos recentemente. O Lixo da aplicação guarda os ficheiros que o utilizador move para lá até serem restaurados ou eliminados permanentemente. As capturas temporárias da câmara são guardadas na cache da aplicação.
+
+Esta informação não é enviada para servidores operados pelo programador. Permanece no dispositivo, exceto quando o utilizador partilha explicitamente um ficheiro ou o remove. A limpeza dos dados da aplicação ou a desinstalação remove os ficheiros da área privada e as preferências locais.
+
+### Processamento e partilha
+
+As operações PDF são executadas localmente com bibliotecas Android e PDFBox. O PDF Max não envia o conteúdo dos documentos para a Internet. A aplicação abre o menu de partilha do Android apenas depois de o utilizador escolher partilhar um resultado. A aplicação que recebe o ficheiro passa a tratá-lo de acordo com a sua própria política de privacidade.
+
+### Privacidade de menores e alterações
+
+O PDF Max não recolhe intencionalmente informações pessoais de crianças ou adultos. Esta política poderá ser atualizada quando as funcionalidades da aplicação mudarem. A versão atual e a data de atualização aparecem no início deste documento.
