@@ -220,7 +220,7 @@ fun ToolWorkspaceScreen(
                 "to_images" -> {
                     Text(if (english) "IMAGE QUALITY" else "QUALIDADE DAS IMAGENS", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
                     Spacer(Modifier.height(8.dp))
-                    Text("\${dpi.toInt()} DPI", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text(dpi.toInt().toString() + " DPI", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                     Slider(value = dpi, onValueChange = { dpi = it }, valueRange = 96f..240f, steps = 5)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(if (english) "Smaller files" else "Ficheiros menores", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

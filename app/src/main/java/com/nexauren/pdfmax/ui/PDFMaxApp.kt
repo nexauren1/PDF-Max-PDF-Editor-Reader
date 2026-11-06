@@ -1084,8 +1084,9 @@ private fun ReaderScreen(
     onFavorite: () -> Unit,
     onTools: () -> Unit
 ) {
+    val context = LocalContext.current
     val pageCount by produceState<Int?>(null, file.absolutePath) {
-        value = withContext(Dispatchers.IO) { runCatching { PdfEngine.pageCount(LocalContext.current, file) }.getOrNull() }
+        value = withContext(Dispatchers.IO) { runCatching { PdfEngine.pageCount(context, file) }.getOrNull() }
     }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {

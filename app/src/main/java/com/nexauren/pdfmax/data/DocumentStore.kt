@@ -128,7 +128,7 @@ class DocumentStore(context: Context) {
     }
 
     fun storageUsedBytes(): Long =
-        (documentsDirectory.listFiles().orEmpty() + trashDirectory.listFiles().orEmpty())
+        (documentsDirectory.listFiles().orEmpty().toList() + trashDirectory.listFiles().orEmpty().toList())
             .filter { it.isFile }.sumOf { it.length() }
 
     private fun uniqueFile(directory: File, name: String): File {
